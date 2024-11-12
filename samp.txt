@@ -95,3 +95,19 @@ public class GitController {
         }
     }
 }
+
+
+public class GitCloneTest {
+    public static void main(String[] args) {
+        try (Git git = Git.cloneRepository()
+                .setURI("https://github.com/username/repo.git")
+                .setDirectory(new File("/path/to/clone"))
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider("", "your-github-token"))
+                .call()) {
+            System.out.println("Repository cloned successfully");
+        } catch (GitAPIException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
