@@ -111,3 +111,55 @@ public class GitCloneTest {
     }
 }
 
+
+
+// gitService.js
+const simpleGit = require('simple-git');
+const fs = require('fs').promises;
+const rimraf = require('rimraf'); // For cleanup
+require('dotenv').config();
+
+const git = simpleGit();
+
+async function cloneRepoAndCommit(repoUrl, branch, filePath, fileContent) {
+    const localDir = './temp-repo';
+
+    try {
+        // Clone the repository
+        await git.clone(repoUrl, localDir, ['-b', branch]);
+
+        // Change the working directory to the cloned repository
+        const repo = simpleGit(localDir);
+
+        // Write content to the specified file
+        await fs.writeFile(`${localDir}/${filePath}`, fileContent);
+
+        // Stage, commit, and push changes
+        await repo.add(filePath);
+        await repo.commit('Add or update file via Node.js script');
+        await repo.push(['-u', 'origin', branch], {
+            '-o': `https://${process.env.GITHUB_TOKEN}@${repoUrl.split('https://')[1]}`,
+        });
+
+        console.log('Commit successful!');
+    } catch (error) {
+        console.error('Error committing to the repository:', error.message);
+    } finally {
+        // Clean up the cloned repository
+        rimraf.sync(localDir); // Delete the cloned directory after commit
+    }
+}
+
+module.exports = cloneRepoAndCommit;
+
+
+
+// index.js
+const cloneRepoAndCommit = require('./gitService');
+
+const repoUrl = 'https://github.com/your-username/your-repo.git';
+const branch = 'main';
+const filePath = 'src/main/resources/test.txt';
+const fileContent = 'Hello, this is a test commit from Node.js!';
+
+cloneRepoAndCommit(repoUrl, branch, filePath, fileContent);
