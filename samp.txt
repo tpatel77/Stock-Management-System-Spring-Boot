@@ -163,3 +163,31 @@ const filePath = 'src/main/resources/test.txt';
 const fileContent = 'Hello, this is a test commit from Node.js!';
 
 cloneRepoAndCommit(repoUrl, branch, filePath, fileContent);
+
+
+
+import org.kohsuke.github.*;
+
+@Service
+public class GitHubService {
+
+    private final GitHub github;
+    private final String repositoryName = "username/repo-name"; // replace with your repo
+
+    public GitHubService(@Value("${github.token}") String token) throws IOException {
+        this.github = new GitHubBuilder().withOAuthToken(token).build();
+    }
+
+    public void commitFile(String filePath, String content, String commitMessage) throws IOException {
+        GHRepository repo = github.getRepository(repositoryName);
+        GHContent contentFile;
+
+        try {
+            contentFile = repo.getFileContent(filePath);
+            contentFile.update(content, commitMessage);
+        } catch (GHFileNotFoundException e) {
+            repo.createContent(content, commitMessage, filePath);
+        }
+    }
+}
+
