@@ -510,3 +510,81 @@ public class YamlGeneratorService {
         }
     }
 }
+
+
+
+import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class YamlGeneratorService {
+
+    public void createYamlFile() {
+        // Initialize a LinkedHashMap to maintain order
+        Map<String, Object> data = new LinkedHashMap<>();
+
+        // Argo section
+        Map<String, Object> argo = new LinkedHashMap<>();
+        argo.put("project", "default");
+        argo.put("manifestRepo", "https://github.com/random/abc.git");
+        argo.put("notifyEmailList", "abc@gmail.com");
+        data.put("argo", argo);
+
+        // Istio internal hosts
+        data.put("istioInternalHosts", Arrays.asList("internal-non-prod.com"));
+
+        // Istio external hosts (commented)
+        data.put("istioExternallHosts", Arrays.asList(""));  // Placeholder for commented-out data
+
+        // Istio hosts
+        data.put("istioHosts", "[\"internal-non-prod.com\"]");
+
+        // JWT Vault section
+        Map<String, Object> jwtVault = new LinkedHashMap<>();
+        jwtVault.put("vaultURL", "https://vault-nonprod.abc.com");
+        jwtVault.put("tenant", "abcdefg");
+        jwtVault.put("kubernetesCluster", "efghijk");
+        jwtVault.put("externalSecrets", Arrays.asList("do_not_delete_this_secret"));
+        data.put("jwtVault", jwtVault);
+
+        // Namespace details
+        Map<String, Object> namespaceDetails = new LinkedHashMap<>();
+        namespaceDetails.put("defaultMemory", "400Mi");
+        namespaceDetails.put("defaultCpu", "100m");
+        namespaceDetails.put("maxMemory", "1Gi");
+        namespaceDetails.put("maxCpu", "2");
+        data.put("namespaceDetails", namespaceDetails);
+
+        // YAML output options
+        DumperOptions options = new DumperOptions();
+        options.setIndent(2);
+        options.setPrettyFlow(true);
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+
+        // Write to YAML file
+        Yaml yaml = new Yaml(options);
+        try (FileWriter writer = new FileWriter("output.yaml")) {
+            // Write Argo data
+            yaml.dump(data, writer);
+
+            // Add comments for structure
+            writer.write("\n#istio related values\n");
+            writer.write("\n# istioExternallHosts: | \n#   - \"\"\n");
+            writer.write("\n#istio Host details for Istio auth\n");
+
+            // Closing comments for namespace resources
+            writer.write("\n#namespace resources default and limits\n");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
