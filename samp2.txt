@@ -1,0 +1,197 @@
+account_id         = "mTAwmqz1S4SUALu7bLm2jQ"
+project_identifier = "specialty_sprx"
+org_identifier     = "cvsdigital"
+
+
+services_list = [
+  {
+    "service" : {
+      "name" : "spl-domain-notessummary",
+      "description" : "Harness service for spl-domain-notessummary.",
+      "tags" : [
+        "app-type: springboot",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "service" : {
+      "name" : "spl-domain-referrals",
+      "description" : "Harness service for spl-domain-referrals.",
+      "tags" : [
+        "app-type: springboot",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "service" : {
+      "name" : "intent-manager-context-handler",
+      "description" : "Harness service for intent-manager-context-handler.",
+      "tags" : [
+        "app-type: python",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "service" : {
+      "name" : "digitalpharmacyrouter",
+      "description" : "Harness service for graphql router spl",
+      "tags" : [
+        "app-type: docker",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "service" : {
+      "name" : "digital-experience-api",
+      "description" : "Harness service for digital-experience-api",
+      "tags" : [
+        "app-type: nodejs",
+        "ns-category: sprx",
+        "app-classification: i90"
+      ]
+    }
+  },
+  {
+    "service" : {
+      "name" : "enterprise-capability-promptassist",
+      "description" : "Harness service for enterprise-capability-promptassist",
+      "tags" : [
+        "app-type: nodejs",
+        "ns-category: sprx",
+        "app-classification: i90"
+      ]
+    }
+  }
+]
+
+environment_list = [
+  {
+    "environment" : {
+      "name" : "sprx-dev1",
+      "description" : "Harness environment dev1.",
+      "type" : "PreProduction",
+      "connector_name" : "specialty-sprx-gke-connector",
+      "tags" : [
+        "env-type: dev",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "environment" : {
+      "name" : "sprx-sit1",
+      "description" : "Harness environment sit1.",
+      "type" : "PreProduction",
+      "connector_name" : "gke-specialty-sprx-connector",
+      "tags" : [
+        "env-type: sit",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "environment" : {
+      "name" : "sprx-pt",
+      "description" : "Harness environment pt.",
+      "type" : "PreProduction",
+      "connector_name" : "pt-specialty-sprx-connector",
+      "tags" : [
+        "env-type: pt",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "environment" : {
+      "name" : "sprx-prod",
+      "description" : "Harness environment prod.",
+      "type" : "Production",
+      "connector_name" : "prod-specialty-sprx-connector",
+      "tags" : [
+        "env-type: prod",
+        "ns-category: sprx"
+      ]
+    }
+  },
+  {
+    "environment" : {
+      "name" : "sprx-dr",
+      "description" : "Harness environment dr.",
+      "type" : "Production",
+      "connector_name" : "dr-specialty-sprx-connector",
+      "tags" : [
+        "env-type: dr",
+        "ns-category: sprx"
+      ]
+    }
+  }
+]
+
+prometheus_list = []
+
+k8s_connector_list = [
+  {
+    "k8s_connector" : {
+      "name" : "specialty-sprx-gke-connector",
+      "description" : "Kubernetes connector for specialty-sprx-gke cluster",
+      "delegate_selectors" : [
+        "specialty-sprx-gke-ng-delegate"
+      ],
+      "tags" : [
+        "cluster: specialty-sprx-gke"
+      ]
+    }
+  },
+  {
+    "k8s_connector" : {
+      "name" : "gke-specialty-sprx-connector",
+      "description" : "Kubernetes connector for gke-specialty-sprx cluster",
+      "delegate_selectors" : [
+        "gke-specialty-sprx-ng-delegate"
+      ],
+      "tags" : [
+        "cluster: gke-specialty-sprx"
+      ]
+    }
+  },
+  {
+    "k8s_connector" : {
+      "name" : "pt-specialty-sprx-connector",
+      "description" : "Kubernetes connector for gke-specialty-sprx cluster",
+      "delegate_selectors" : [
+        "pt-specialty-sprx-ng-delegate"
+      ],
+      "tags" : [
+        "cluster: pt-specialty-sprx"
+      ]
+    }
+  },
+  {
+    "k8s_connector" : {
+      "name" : "dr-specialty-sprx-connector",
+      "description" : "Kubernetes connector for dr-specialty-sprx cluster",
+      "delegate_selectors" : [
+        "dr-specialty-sprx-ng-delegate"
+      ],
+      "tags" : [
+        "cluster: dr-specialty-sprx"
+      ]
+    }
+  },
+  {
+    "k8s_connector" : {
+      "name" : "prod-specialty-sprx-connector",
+      "description" : "Kubernetes connector for prod-specialty-sprx cluster",
+      "delegate_selectors" : [
+        "prod-specialty-sprx-ng-delegate"
+      ],
+      "tags" : [
+        "cluster: prod-specialty-sprx"
+      ]
+    }
+  }
+]
