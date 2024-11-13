@@ -262,3 +262,69 @@ public class TfvarsService {
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);  // Pretty-print JSON
         objectMapper.writeValue(new File(JSON_FILE_PATH), tfvarsData);  // Write JSON to specified file
     }
+
+
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.List;
+import java.util.ArrayList;
+
+public class TfvarsFileModifier {
+
+    public static void main(String[] args) {
+        String filePath = "path/to/your/file.tfvars"; // Specify your .tfvars file path
+
+        // Define the new environment to add
+        String newEnvironment = "  {\n" +
+                                "    \"environment\" : {\n" +
+                                "      \"name\" : \"sprx-dev1\",\n" +
+                                "      \"description\" : \"Harness environment dev1.\",\n" +
+                                "      \"type\" : \"PreProduction\",\n" +
+                                "      \"connector_name\" : \"specialty-sprx-gke-connector\",\n" +
+                                "      \"tags\" : [\n" +
+                                "        \"env-type: dev\",\n" +
+                                "        \"ns-category: sprx\"\n" +
+                                "      ]\n" +
+                                "    }\n" +
+                                "  }";
+
+        try {
+            // Read all lines from the file
+            List<String> lines = Files.readAllLines(Paths.get(filePath));
+            List<String> modifiedLines = new ArrayList<>();
+            boolean environmentListFound = false;
+
+            for (String line : lines) {
+                modifiedLines.add(line);
+
+                // Check if we are at the end of the environment_list array
+                if (line.trim().equals("]") && environmentListFound) {
+                    // Insert a comma before the new environment if there are already other entries
+                    int lastEntryIndex = modifiedLines.size() - 2;
+                    if (modifiedLines.get(lastEntryIndex).trim().endsWith("}")) {
+                        modifiedLines.set(lastEntryIndex, modifiedLines.get(lastEntryIndex) + ",");
+                    }
+
+                    // Add the new environment entry before the closing bracket
+                    modifiedLines.add(newEnvironment);
+                    modifiedLines.add("]");
+                    break;
+                }
+
+                // Detect the start of the environment_list array
+                if (line.trim().startsWith("environment_list = [")) {
+                    environmentListFound = true;
+                }
+            }
+
+            // Write the modified lines back to the file
+            Files.write(Paths.get(filePath), modifiedLines);
+            System.out.println("New environment added successfully.");
+
+        } catch (IOException e) {
+            System.err.println("Error while reading or writing the .tfvars file: " + e.getMessage());
+        }
+    }
+}
+
