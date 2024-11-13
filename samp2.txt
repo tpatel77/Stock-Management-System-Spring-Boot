@@ -404,3 +404,109 @@ namespaceDetails:
   defaultCpu: "100m"
   maxMemory: "1Gi"
   maxCpu: "2"
+
+
+
+<dependency>
+    <groupId>org.yaml</groupId>
+    <artifactId>snakeyaml</artifactId>
+    <version>2.0</version>
+</dependency>
+
+public class ArgoConfig {
+    private String project;
+    private String manifestRepo;
+    private String notifyEmailList;
+
+    // Getters and Setters
+}
+import java.util.List;
+
+public class JwtVaultConfig {
+    private String vaultURL;
+    private String tenant;
+    private String kubernetesCluster;
+    private List<String> externalSecrets;
+
+    // Getters and Setters
+}
+
+
+public class NamespaceDetails {
+    private String defaultMemory;
+    private String defaultCpu;
+    private String maxMemory;
+    private String maxCpu;
+
+    // Getters and Setters
+}
+
+
+import java.util.List;
+
+public class AppConfig {
+    private ArgoConfig argo;
+    private List<String> istioInternalHosts;
+    private List<String> istioHosts;
+    private JwtVaultConfig jwtVault;
+    private NamespaceDetails namespaceDetails;
+
+    // Getters and Setters
+}
+
+
+import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Arrays;
+
+@Service
+public class YamlGeneratorService {
+
+    public void createYamlFile() {
+        // Populate Argo configuration
+        ArgoConfig argoConfig = new ArgoConfig();
+        argoConfig.setProject("default");
+        argoConfig.setManifestRepo("https://github.com/random/abc.git");
+        argoConfig.setNotifyEmailList("abc@gmail.com");
+
+        // Populate JWT Vault configuration
+        JwtVaultConfig jwtVaultConfig = new JwtVaultConfig();
+        jwtVaultConfig.setVaultURL("https://vault-nonprod.abc.com");
+        jwtVaultConfig.setTenant("abcdefg");
+        jwtVaultConfig.setKubernetesCluster("efghijk");
+        jwtVaultConfig.setExternalSecrets(Arrays.asList("do_not_delete_this_secret"));
+
+        // Populate Namespace details
+        NamespaceDetails namespaceDetails = new NamespaceDetails();
+        namespaceDetails.setDefaultMemory("400Mi");
+        namespaceDetails.setDefaultCpu("100m");
+        namespaceDetails.setMaxMemory("1Gi");
+        namespaceDetails.setMaxCpu("2");
+
+        // Populate AppConfig with all settings
+        AppConfig appConfig = new AppConfig();
+        appConfig.setArgo(argoConfig);
+        appConfig.setIstioInternalHosts(Arrays.asList("internal-non-prod.com"));
+        appConfig.setIstioHosts(Arrays.asList("internal-non-prod.com"));
+        appConfig.setJwtVault(jwtVaultConfig);
+        appConfig.setNamespaceDetails(namespaceDetails);
+
+        // Set YAML output options
+        DumperOptions options = new DumperOptions();
+        options.setIndent(2);
+        options.setPrettyFlow(true);
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+
+        // Write to YAML file
+        Yaml yaml = new Yaml(options);
+        try (FileWriter writer = new FileWriter("output.yaml")) {
+            yaml.dump(appConfig, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
