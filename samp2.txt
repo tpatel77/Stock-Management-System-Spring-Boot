@@ -195,3 +195,63 @@ k8s_connector_list = [
     }
   }
 ]
+
+
+
+
+import com.bertramlabs.plugins.hcl4j.HCLParser;
+import com.bertramlabs.plugins.hcl4j.HCLWriter;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class TfvarsService {
+
+    private static final String FILE_PATH = "path/to/your/file.tfvars"; // Update this with the actual path
+
+    public void addNewEnvironment() {
+        try {
+            // Step 1: Parse the .tfvars file
+            HCLParser parser = new HCLParser();
+            Map<String, Object> tfvarsData = parser.parse(new File(FILE_PATH));
+
+            // Step 2: Get the environment_list and add a new environment
+            List<Map<String, Object>> environmentList = (List<Map<String, Object>>) tfvarsData.get("environment_list");
+
+            // Create a new environment
+            Map<String, Object> newEnvironment = new HashMap<>();
+            newEnvironment.put("name", "new-env");
+            newEnvironment.put("description", "Description for new environment");
+            newEnvironment.put("type", "PreProduction");
+            newEnvironment.put("connector_name", "new-env-connector");
+            List<String> tags = List.of("env-type: new", "ns-category: sprx");
+            newEnvironment.put("tags", tags);
+
+            // Add to environment_list
+            Map<String, Object> newEnvMap = new HashMap<>();
+            newEnvMap.put("environment", newEnvironment);
+            environmentList.add(newEnvMap);
+
+            // Step 3: Write the modified content back to the file
+            writeTfvarsFile(tfvarsData);
+
+        } catch (Exception e) {
+            System.err.println("Error processing .tfvars file: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void writeTfvarsFile(Map<String, Object> tfvarsData) throws IOException {
+        HCLWriter writer = new HCLWriter();
+        try (FileWriter fileWriter = new FileWriter(FILE_PATH)) {
+            fileWriter.write(writer.toString(tfvarsData));
+        }
+    }
+}
