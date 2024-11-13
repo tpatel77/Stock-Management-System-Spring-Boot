@@ -373,3 +373,34 @@ public class EnvironmentBuilder {
     }
 }
 
+
+
+#argocd related data
+argo:
+  project: default
+  manifestRepo: "https://github.com/random/abc.git"
+  notifyEmailList: "abc@gmail.com"
+  
+#istio related values
+istioInternalHosts: |
+  - "internal-non-prod.com"
+
+# istioExternallHosts: | 
+#   - ""
+  
+#istio Host details for Istio auth
+istioHosts: '["internal-non-prod.com"]'
+
+jwtVault:
+  vaultURL: "https://vault-nonprod.abc.com"
+  tenant: "abcdefg"
+  kubernetesCluster: "efghijk"
+  externalSecrets:
+    - do_not_delete_this_secret
+
+#namespace resources default and limits
+namespaceDetails:
+  defaultMemory: "400Mi"
+  defaultCpu: "100m"
+  maxMemory: "1Gi"
+  maxCpu: "2"
