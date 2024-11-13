@@ -255,3 +255,10 @@ public class TfvarsService {
         }
     }
 }
+
+
+ private void writeTfvarsAsJson(Map<String, Object> tfvarsData) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);  // Pretty-print JSON
+        objectMapper.writeValue(new File(JSON_FILE_PATH), tfvarsData);  // Write JSON to specified file
+    }
