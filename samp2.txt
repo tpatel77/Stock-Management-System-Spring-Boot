@@ -328,3 +328,48 @@ public class TfvarsFileModifier {
     }
 }
 
+
+import java.util.List;
+
+public class EnvironmentBuilder {
+
+    public static void main(String[] args) {
+        // Example usage
+        String name = "sprx-dev1";
+        String description = "Harness environment dev1.";
+        String type = "PreProduction";
+        String connectorName = "specialty-sprx-gke-connector";
+        List<String> tags = List.of("env-type: dev", "ns-category: sprx");
+
+        String newEnvironment = buildEnvironmentString(name, description, type, connectorName, tags);
+        System.out.println(newEnvironment);
+    }
+
+    public static String buildEnvironmentString(String name, String description, String type, String connectorName, List<String> tags) {
+        StringBuilder environmentBuilder = new StringBuilder();
+
+        environmentBuilder.append("  {\n");
+        environmentBuilder.append("    \"environment\" : {\n");
+        environmentBuilder.append("      \"name\" : \"").append(name).append("\",\n");
+        environmentBuilder.append("      \"description\" : \"").append(description).append("\",\n");
+        environmentBuilder.append("      \"type\" : \"").append(type).append("\",\n");
+        environmentBuilder.append("      \"connector_name\" : \"").append(connectorName).append("\",\n");
+        
+        // Add tags array
+        environmentBuilder.append("      \"tags\" : [\n");
+        for (int i = 0; i < tags.size(); i++) {
+            environmentBuilder.append("        \"").append(tags.get(i)).append("\"");
+            if (i < tags.size() - 1) {
+                environmentBuilder.append(",");
+            }
+            environmentBuilder.append("\n");
+        }
+        environmentBuilder.append("      ]\n");
+
+        environmentBuilder.append("    }\n");
+        environmentBuilder.append("  }");
+
+        return environmentBuilder.toString();
+    }
+}
+
