@@ -1,0 +1,24 @@
+import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GHRepository;
+
+public class GitHubAuthExample {
+    public static void main(String[] args) {
+        try {
+            // Authenticate using a personal access token
+            GitHub github = GitHub.connectUsingOAuth("your_personal_access_token");
+
+            // Test the connection
+            if (github.isCredentialValid()) {
+                System.out.println("Authentication successful!");
+
+                // Example: Get a repository
+                GHRepository repository = github.getRepository("owner/repository-name");
+                System.out.println("Repo: " + repository.getFullName());
+            } else {
+                System.out.println("Authentication failed.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
