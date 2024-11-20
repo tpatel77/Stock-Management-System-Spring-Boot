@@ -22,3 +22,79 @@ public class GitHubAuthExample {
         }
     }
 }
+
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class ModifyEnvironmentList {
+    public static void main(String[] args) {
+        String input = """
+                account_id         = "mTAwmqz1S4SUALu7bLm2jQ"
+                project_identifier = "specialty_sprx"
+                org_identifier     = "cvsdigital"
+
+                environment_list = [
+                  {
+                    "environment" : {
+                      "name" : "sprx-dev1",
+                      "description" : "Harness environment dev1.",
+                      "type" : "PreProduction",
+                      "connector_name" : "specialty-sprx-gke-connector",
+                      "tags" : [
+                        "env-type: dev",
+                        "ns-category: sprx"
+                      ]
+                    }
+                  },
+                  {
+                    "environment" : {
+                      "name" : "sprx-sit1",
+                      "description" : "Harness environment sit1.",
+                      "type" : "PreProduction",
+                      "connector_name" : "gke-specialty-sprx-connector",
+                      "tags" : [
+                        "env-type: sit",
+                        "ns-category: sprx"
+                      ]
+                    }
+                  }
+                ]
+
+                prometheus_list = []
+                """;
+
+        // New environment string to add
+        String newEnvironment = """
+          {
+            "environment" : {
+              "name" : "sprx-abc",
+              "description" : "Harness environment prod.",
+              "type" : "Production",
+              "connector_name" : "prod-specialty-sprx-connector",
+              "tags" : [
+                "env-type: prod",
+                "ns-category: sprx"
+              ]
+            }
+          }
+        """;
+
+        // Regular expression to find the environment_list
+        String regex = "(environment_list\\s*=\\s*\\[)";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        if (matcher.find()) {
+            // Insert the new environment after the start of the environment list
+            int insertPosition = matcher.end();
+            String modifiedInput = input.substring(0, insertPosition) + "\n" + newEnvironment + "," + input.substring(insertPosition);
+
+            System.out.println("Modified string:");
+            System.out.println(modifiedInput);
+        } else {
+            System.out.println("environment_list not found in the input.");
+        }
+    }
+}
+
