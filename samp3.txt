@@ -98,3 +98,88 @@ public class ModifyEnvironmentList {
     }
 }
 
+
+package com.example.certconverter;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
+import org.bouncycastle.util.io.pem.PemWriter;
+
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+
+@SpringBootApplication
+public class CertConverterApplication implements CommandLineRunner {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CertConverterApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) {
+        if (args.length != 2) {
+            System.err.println("Usage: java -jar certconverter.jar <input.pem> <output.pcks8>");
+            return;
+        }
+
+        String inputFilePath = args[0];
+        String outputFilePath = args[1];
+
+        try {
+            convertPemToPkcs8(inputFilePath, outputFilePath);
+            System.out.println("Conversion successful. Output saved to " + outputFilePath);
+        } catch (Exception e) {
+            System.err.println("Error converting PEM to PKCS8: " + e.getMessage());
+        }
+    }
+
+    private void convertPemToPkcs8(String inputFilePath, String outputFilePath) throws Exception {
+        // Read the PEM file
+        PemObject pemObject;
+        try (PemReader pemReader = new PemReader(Files.newBufferedReader(Paths.get(inputFilePath)))) {
+            pemObject = pemReader.readPemObject();
+        }
+
+        if (pemObject == null || !"PRIVATE KEY".equals(pemObject.getType())) {
+            throw new IllegalArgumentException("Invalid PEM file: Expected a PRIVATE KEY");
+        }
+
+        byte[] privateKeyBytes = pemObject.getContent();
+
+        // Convert the PEM key to PKCS8 format
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privateKeyBytes);
+        PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+
+        byte[] pkcs8Bytes = privateKey.getEncoded();
+
+        // Write the PKCS8 private key to a file
+        try (PemWriter pemWriter = new PemWriter(new FileOutputStream(outputFilePath))) {
+            PemObject pkcs8PemObject = new PemObject("PRIVATE KEY", pkcs8Bytes);
+            pemWriter.writeObject(pkcs8PemObject);
+        }
+    }
+}
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk15on</artifactId>
+        <version>1.70</version>
+    </dependency>
+</dependencies>
+
