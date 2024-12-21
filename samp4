@@ -1,0 +1,46 @@
+<div class="container mt-5">
+  <!-- Dropdown Button -->
+  <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+    Select Options
+  </button>
+
+  <!-- Dropdown Menu with Checkboxes -->
+  <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+    <li *ngFor="let option of options">
+      <label class="dropdown-item">
+        <input type="checkbox" [(ngModel)]="option.selected" (change)="updateButtonText()">
+        {{ option.name }}
+      </label>
+    </li>
+  </ul>
+</div>
+
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-dropdown-checkbox',
+  templateUrl: './dropdown-checkbox.component.html',
+  styleUrls: ['./dropdown-checkbox.component.css']
+})
+export class DropdownCheckboxComponent {
+  // Options for the dropdown
+  options = [
+    { name: 'Option 1', selected: false },
+    { name: 'Option 2', selected: false },
+    { name: 'Option 3', selected: false },
+    { name: 'Option 4', selected: false }
+  ];
+
+  // Button text (initially showing default text)
+  buttonText = 'Select Options';
+
+  // Update the button text with the selected options
+  updateButtonText() {
+    const selectedOptions = this.options.filter(option => option.selected).map(option => option.name);
+    if (selectedOptions.length > 0) {
+      this.buttonText = selectedOptions.join(', ');
+    } else {
+      this.buttonText = 'Select Options';
+    }
+  }
+}
