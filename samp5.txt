@@ -1,0 +1,55 @@
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+public class KeywordFilter {
+
+    public static List<String> removeSentencesWithKeywords(List<String> section, List<String> keywords) {
+        // Create a list to store updated sections
+        List<String> updatedSection = new ArrayList<>();
+
+        // Loop through each entry in the section
+        for (String entry : section) {
+            // Split the entry into sentences using a regex pattern
+            String[] sentences = entry.split("(?<=\\.) ");
+
+            // Filter sentences that do not contain any of the keywords
+            StringBuilder filteredSentences = new StringBuilder();
+            for (String sentence : sentences) {
+                boolean containsKeyword = false;
+                for (String keyword : keywords) {
+                    if (sentence.toLowerCase().contains(keyword.toLowerCase())) {
+                        containsKeyword = true;
+                        break;
+                    }
+                }
+                if (!containsKeyword) {
+                    if (filteredSentences.length() > 0) {
+                        filteredSentences.append(" ");
+                    }
+                    filteredSentences.append(sentence);
+                }
+            }
+
+            // Add the filtered entry to the updated section if it is not empty
+            String combinedEntry = filteredSentences.toString().trim();
+            if (!combinedEntry.isEmpty()) {
+                updatedSection.add(combinedEntry);
+            }
+        }
+
+        return updatedSection;
+    }
+
+    public static void main(String[] args) {
+        // Example usage
+        List<String> section = List.of(
+            "This is a test. It contains some keywords. This sentence is clean.",
+            "Another test sentence. Keywords are not here."
+        );
+        List<String> keywords = List.of("keywords", "test");
+
+        List<String> result = removeSentencesWithKeywords(section, keywords);
+        System.out.println(result);
+    }
+}
