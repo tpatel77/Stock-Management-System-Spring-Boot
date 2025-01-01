@@ -176,3 +176,66 @@ public class NoteSorterApplication {
     }
 }
 
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+@SpringBootApplication
+public class NoteCombinerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(NoteCombinerApplication.class, args);
+
+        // Example usage
+        List<String> notesList = List.of(
+            "01/05/2022: Summary one",
+            "01/05/2022: Summary two",
+            "12/25/2021: Another summary",
+            "No date summary"
+        );
+
+        List<String> combinedNotes = combineSummariesByDate(notesList);
+        System.out.println(combinedNotes);
+    }
+
+    public static List<String> combineSummariesByDate(List<String> notesList) {
+        // Map to group notes by date
+        Map<String, List<String>> groupedNotes = new HashMap<>();
+        Pattern datePattern = Pattern.compile("\\b\\d{2}/\\d{2}/\\d{4}\\b");
+
+        // Group notes by date
+        for (String note : notesList) {
+            Matcher matcher = datePattern.matcher(note);
+            String dateKey;
+            if (matcher.find()) {
+                dateKey = matcher.group();
+                String content = note.split(":", 2)[1].trim();
+                groupedNotes.computeIfAbsent(dateKey, k -> new ArrayList<>()).add(content);
+            } else {
+                dateKey = "NO_DATE";
+                groupedNotes.computeIfAbsent(dateKey, k -> new ArrayList<>()).add(note);
+            }
+        }
+
+        // Combine grouped notes into a single list
+        List<String> combinedNotes = new ArrayList<>();
+        for (Map.Entry<String, List<String>> entry : groupedNotes.entrySet()) {
+            String date = entry.getKey();
+            List<String> contents = entry.getValue();
+            if ("NO_DATE".equals(date)) {
+                combinedNotes.addAll(contents);
+            } else {
+                String combinedContent = contents.stream().collect(Collectors.joining(" and "));
+                combinedNotes.add(date + ": " + combinedContent);
+            }
+        }
+
+        return combinedNotes;
+    }
+}
