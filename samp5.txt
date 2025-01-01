@@ -337,3 +337,97 @@ public class NextBestActionApplication {
     }
 }
 
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@SpringBootApplication
+public class CombinedOutputProcessorApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CombinedOutputProcessorApplication.class, args);
+
+        // Example usage
+        Map<String, Object> combinedOutput = new HashMap<>();
+        combinedOutput.put("patientActivities", Map.of(
+            "taskSummary", List.of(
+                Map.of("taskName", "PA TASKS - ASSIGNED", "genNotesSummary", List.of("Example gen note")),
+                Map.of("taskName", "OTHER TASK", "genNotesSummary", List.of("Should be excluded"))
+            ),
+            "shipmentsSummary", List.of("Example shipment note")
+        ));
+
+        combinedOutput = postprocessCombinedOutput(combinedOutput);
+        System.out.println(combinedOutput);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> postprocessCombinedOutput(Map<String, Object> combinedOutput) {
+        // Keywords to exclude
+        List<String> keywordsToExcludeOpenCloseNotes = List.of("PA Tasks", "PA Task");
+        List<String> keywordsToExcludeGen = List.of(
+            "Inbound", "outbound", "Silverlink", "automated call", "IBC",
+            "<SM><FFT-PATIENT-CONTACT (NSM)>", "<SM><FFT-PA-NEEDED (NSM)>", "<SM><DOCTOR NO RESPONSE(SM)>"
+        );
+        List<String> keywordsToExcludeOtherNotes = List.of("GEN:", "GEN -", "BIL");
+
+        List<String> includedTaskNames = List.of(
+            "PA TASKS - ASSIGNED", "PA TASKS - UNASSIGNED", 
+            "PA TASK - ASSIGNED", "PA TASK - UNASSIGNED"
+        );
+
+        // Filter tasks
+        Map<String, Object> patientActivities = (Map<String, Object>) combinedOutput.get("patientActivities");
+        if (patientActivities != null) {
+            List<Map<String, Object>> taskSummary = (List<Map<String, Object>>) patientActivities.getOrDefault("taskSummary", new ArrayList<>());
+            List<Map<String, Object>> filteredTasks = taskSummary.stream()
+                .filter(task -> includedTaskNames.contains(task.get("taskName")))
+                .collect(Collectors.toList());
+
+            // Clean up task names and process summaries
+            for (Map<String, Object> task : filteredTasks) {
+                String taskName = (String) task.get("taskName");
+                task.put("taskName", taskName.split("-")[0].trim());
+
+                task.put("genNotesSummary", postprocessSection((List<String>) task.getOrDefault("genNotesSummary", new ArrayList<>()), keywordsToExcludeGen));
+                task.put("bilNotesSummary", postprocessSection((List<String>) task.getOrDefault("bilNotesSummary", new ArrayList<>()), new ArrayList<>()));
+                task.put("inboundCommunicationSummary", postprocessSection((List<String>) task.getOrDefault("inboundCommunicationSummary", new ArrayList<>()), List.of("GEN", "BIL", "outbound call", "OAC")));
+                task.put("outboundCommunicationSummary", postprocessSection((List<String>) task.getOrDefault("outboundCommunicationSummary", new ArrayList<>()), List.of("GEN", "BIL", "inbound call", "IBC")));
+                task.put("insuranceInformation", postprocessSection((List<String>) task.getOrDefault("insuranceInformation", new ArrayList<>()), new ArrayList<>()));
+
+                task.remove("otherNotesSummary");
+            }
+
+            patientActivities.put("taskSummary", filteredTasks);
+
+            // Process other summaries
+            patientActivities.put("shipmentsSummary", postprocessSection((List<String>) patientActivities.getOrDefault("shipmentsSummary", new ArrayList<>()), new ArrayList<>()));
+            patientActivities.put("openTasksSummary", postprocessSection((List<String>) patientActivities.getOrDefault("openTasksSummary", new ArrayList<>()), keywordsToExcludeOpenCloseNotes));
+
+            if (patientActivities.containsKey("otherNotesSummary")) {
+                patientActivities.put("otherNotesSummary", postprocessSection((List<String>) patientActivities.get("otherNotesSummary"), keywordsToExcludeOtherNotes));
+            }
+        }
+
+        // Update next best action
+        combinedOutput = updateNextBestAction(combinedOutput);
+
+        return combinedOutput;
+    }
+
+    public static List<String> postprocessSection(List<String> section, List<String> keywordsToExclude) {
+        // Implement the logic to process the section, including sentence removal, duplicate removal, and sorting.
+        // Replace this placeholder with actual logic from previous implementations.
+        return section;
+    }
+
+    public static Map<String, Object> updateNextBestAction(Map<String, Object> combinedOutput) {
+        // Implement the logic to update the next best actions.
+        // Replace this placeholder with actual logic from previous implementations.
+        return combinedOutput;
+    }
+}
+
