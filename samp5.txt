@@ -53,3 +53,45 @@ public class KeywordFilter {
         System.out.println(result);
     }
 }
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class DuplicateRemover {
+
+    public static List<String> removeDuplicates(List<String> notesList) {
+        // Set to track seen note contents
+        Set<String> seen = new HashSet<>();
+        // List to store unique notes
+        List<String> uniqueNotes = new ArrayList<>();
+
+        // Iterate through the notes list
+        for (String note : notesList) {
+            // Extract content after the first colon
+            String[] parts = note.split(":", 2);
+            String noteContent = parts.length > 1 ? parts[1].trim() : note.trim();
+
+            // Check if the content is already seen
+            if (!seen.contains(noteContent)) {
+                seen.add(noteContent);
+                uniqueNotes.add(note);
+            }
+        }
+
+        return uniqueNotes;
+    }
+
+    public static void main(String[] args) {
+        // Example usage
+        List<String> notesList = List.of(
+            "2023-01-01: Note content one",
+            "2023-01-02: Note content two",
+            "2023-01-03: Note content one" // Duplicate content
+        );
+
+        List<String> result = removeDuplicates(notesList);
+        System.out.println(result);
+    }
+}
