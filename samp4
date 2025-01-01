@@ -1,46 +1,526 @@
-<div class="container mt-5">
-  <!-- Dropdown Button -->
-  <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-    Select Options
-  </button>
+import http
+import logging
+import asyncio
+import aiohttp
+import json
+import re
+from fastapi import FastAPI, HTTPException, Depends, APIRouter
+from typing import List, Optional
+from pydantic import BaseModel, Field, ValidationError
 
-  <!-- Dropdown Menu with Checkboxes -->
-  <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-    <li *ngFor="let option of options">
-      <label class="dropdown-item">
-        <input type="checkbox" [(ngModel)]="option.selected" (change)="updateButtonText()">
-        {{ option.name }}
-      </label>
-    </li>
-  </ul>
-</div>
 
-import { Component } from '@angular/core';
+from src.common.config.app_config import Settings, get_application_config, settings
 
-@Component({
-  selector: 'app-dropdown-checkbox',
-  templateUrl: './dropdown-checkbox.component.html',
-  styleUrls: ['./dropdown-checkbox.component.css']
-})
-export class DropdownCheckboxComponent {
-  // Options for the dropdown
-  options = [
-    { name: 'Option 1', selected: false },
-    { name: 'Option 2', selected: false },
-    { name: 'Option 3', selected: false },
-    { name: 'Option 4', selected: false }
-  ];
 
-  // Button text (initially showing default text)
-  buttonText = 'Select Options';
+config = get_application_config()
+router = APIRouter(prefix=f"{config.get('info.app.context-path')}/v1/notes/summary")
 
-  // Update the button text with the selected options
-  updateButtonText() {
-    const selectedOptions = this.options.filter(option => option.selected).map(option => option.name);
-    if (selectedOptions.length > 0) {
-      this.buttonText = selectedOptions.join(', ');
-    } else {
-      this.buttonText = 'Select Options';
+
+# =======================
+#    Helper Functions
+# =======================
+
+def extract_json(text: str):
+    """
+    Extract JSON content from a string that may include markdown-style formatting.
+    """
+    pattern = r'```json(.*?)```'
+    match = re.search(pattern, text, re.DOTALL)
+
+    if match:
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError as e:
+            return {"error": f"Error decoding JSON: {e}"}
+    else:
+        try:
+            json_start = text.find('{')
+            json_ends = text.rfind('}')
+            if json_start != -1 and json_ends != -1:
+                return json.loads(text[json_start:json_ends + 1].strip())
+            else:
+                return {"error": "No valid JSON block found in the text."}
+        except json.JSONDecodeError as e:
+            return {"error": f"Error decoding JSON: {e}"}
+
+
+async def call_x42(payload: dict):
+    """
+    Sends a POST request to the x42 API endpoint with the given payload.
+    """
+    url = 'https://sit2.internal-non-prod.gke-nemo-qa.cvshealth.com/intent-manager-ai/llm/inference'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                if response.status != 200:
+                    error_message = await response.text()
+                    return {"error": f"API call failed with status {response.status}: {error_message}"}
+                return await response.json()
+    except Exception as e:
+        return {"error": f"Error during API call: {e}"}
+
+
+def filter_tasks_by_type(data, task_type):
+    # Filter 'gen_and_bil'
+    data['gen_and_bil'] = [entry for entry in data['gen_and_bil'] if entry['taskName'] in task_type]
+
+    # Filter 'ibc_and_obc'
+    data['ibc_and_obc'] = [entry for entry in data['ibc_and_obc'] if entry['taskName'] in task_type]
+
+    # Filter 'task_trigger' taskSummary
+    data["task_trigger"]['taskSummary'] = [entry for entry in data["task_trigger"]['taskSummary']
+                                                                 if entry['taskName'] in task_type]
+
+    return data
+
+# Apply the filter
+
+def combine_outputs(bill_and_gen, trigger, ibc_obc, open_closed, shipment_other):
+    if isinstance(trigger, dict):
+        trigger = [trigger]
+    elif isinstance(trigger, str):
+        try:
+            trigger = json.loads(trigger)
+            if isinstance(trigger, dict):
+                trigger = [trigger]
+        except json.JSONDecodeError:
+            trigger = []
+    
+    combined_output = {
+        "escalations": {
+            "escalationSeverity": trigger[0]["escalations"][0]["escalationSeverity"] if trigger and trigger[0].get("escalations") and len(trigger[0]["escalations"]) > 0 and "escalationSeverity" in trigger[0]["escalations"][0] else "",
+            "reason": trigger[0]["escalations"][0]["reason"] if trigger and trigger[0].get("escalations") and len(trigger[0]["escalations"]) > 0 and "reason" in trigger[0]["escalations"][0] else ""
+        },
+        "patientActivities": {
+            "taskSummary": [],
+            "shipmentsSummary": shipment_other.get("shipmentsSummary", []),
+            "openTasksSummary": open_closed.get("openTasksSummary", []),
+            "closedTasksSummary": open_closed.get("closedTasksSummary", []),
+            "otherNotesSummary": shipment_other.get("otherNotesSummary", [])
+        },
+        "nextBestActions": trigger[0]["nextBestActions"]
     }
-  }
-}
+    
+    # Create a map for task summaries by rxNumber to merge data
+    task_summary_map = {}
+    
+    # Populate task summaries from bill_and_gen
+    for item in bill_and_gen:
+        task_summary_map[item["rxNumber"]] = {
+            "taskName": item.get("taskName", ""),
+            "rxNumber": item.get("rxNumber", ""),
+            "drugName": item.get("drugName", ""),
+            "prescription": None,  # Placeholder for missing data
+            "taskTrigger": None,  # Placeholder for missing data
+            "bilNotesSummary": item.get("bilNotesSummary", []),
+            "genNotesSummary": item.get("genNotesSummary", []),
+            "csNotesSummary": None,
+            "svNotesSummary": None,
+            "invoiceNotesSummary": None,
+            "rccNotesSummary": None,
+            "inboundCommunicationSummary": [],
+            "outboundCommunicationSummary": [],
+            "insuranceInformation": [],
+            "prescriberInformation": []
+        }
+    
+    # Update task summaries with trigger information (same as before)
+    for item in trigger[0]['taskSummary']:
+        if item.get("rxNumber") in task_summary_map:
+            task_summary_map[item["rxNumber"]].update({
+                "prescription": item.get("prescription", None),
+                "taskTrigger": item.get("taskTrigger", None),
+                "insuranceInformation": item.get("insuranceInformation", []),
+                "prescriberInformation": item.get("prescriberInformation", [])
+            })
+        else:
+            # If task doesn't exist in the map, create a new entry for the trigger task
+            task_summary_map[item["rxNumber"]] = {
+                "taskName": item.get("taskName", ""),
+                "rxNumber": item["rxNumber"],
+                "drugName": item.get("drugName", ""),
+                "prescription": item.get("prescription", None),
+                "taskTrigger": item.get("taskTrigger", None),
+                "bilNotesSummary": [],
+                "genNotesSummary": [],
+                "csNotesSummary": None,
+                "svNotesSummary": None,
+                "invoiceNotesSummary": None,
+                "rccNotesSummary": None,
+                "inboundCommunicationSummary": [],
+                "outboundCommunicationSummary": [],
+                "insuranceInformation": item.get("insuranceInformation", []),
+                "prescriberInformation": item.get("prescriberInformation", [])
+            }
+
+    # Update task summaries with ibc and obc information (same logic as before)
+    for item in ibc_obc:
+        rx_number = item["rxNumber"]
+        
+        # Check if task already exists in the task summary map
+        if rx_number in task_summary_map:
+            task_summary_map[rx_number].update({
+                "inboundCommunicationSummary": item.get("inboundCommunicationSummary", []),
+                "outboundCommunicationSummary": item.get("outboundCommunicationSummary", [])
+            })
+        else:
+            # If task doesn't exist in the task summary, create a new entry with placeholders
+            task_summary_map[rx_number] = {
+                "taskName": item.get("taskName", ""),
+                "rxNumber": rx_number,
+                "drugName": item.get("drugName", ""),
+                "prescription": None,
+                "taskTrigger": None,
+                "bilNotesSummary": [],
+                "genNotesSummary": [],
+                "csNotesSummary": None,
+                "svNotesSummary": None,
+                "invoiceNotesSummary": None,
+                "rccNotesSummary": None,
+                "inboundCommunicationSummary": item.get("inboundCommunicationSummary", []),
+                "outboundCommunicationSummary": item.get("outboundCommunicationSummary", []),
+                "insuranceInformation": [],
+                "prescriberInformation": []
+            }
+
+    # Add combined task summaries to the final output
+    combined_output["patientActivities"]["taskSummary"] = list(task_summary_map.values())
+    
+    return combined_output
+
+
+#########################
+
+import re
+from datetime import datetime
+from collections import defaultdict
+
+def remove_duplicates(notes_list):
+    """Remove duplicates from a list while maintaining order."""
+    seen = set()
+    unique_notes = []
+
+    for note in notes_list:
+        note_content = note.split(':', 1)[-1].strip()  # Extract content ignoring date
+        if note_content not in seen:
+            seen.add(note_content)
+            unique_notes.append(note)
+    return unique_notes
+
+def sort_by_date(notes_list):
+    """Sorts a list of notes in reverse chronological order based on date."""
+    sorted_notes = []
+    for note in notes_list:
+        try:
+            date_match = re.search(r'\b\d{2}/\d{2}/\d{4}\b', note)
+            if date_match:
+                parsed_date = datetime.strptime(date_match.group(), '%m/%d/%Y')
+                sorted_notes.append((parsed_date, note))
+        except ValueError:
+            continue
+    return [note for _, note in sorted(sorted_notes, reverse=True)]
+
+def combine_summaries_by_date(notes_list):
+    """Combines summaries occurring on the same date into a single line."""
+    grouped_notes = defaultdict(list)
+    for note in notes_list:
+        date_match = re.search(r'\b\d{2}/\d{2}/\d{4}\b', note)
+        if date_match:
+            note_date = date_match.group()
+            content = note.split(":", 1)[-1].strip()
+            grouped_notes[note_date].append(content)
+        else:
+            grouped_notes["NO_DATE"].append(note)
+
+    combined_notes = []
+    for date, contents in grouped_notes.items():
+        if date == "NO_DATE":
+            combined_notes.extend(contents)
+        else:
+            combined_notes.append(f"{date}: " + " and ".join(contents))
+    return combined_notes
+
+def remove_sentences_with_keywords(section, keywords):
+    """Removes sentences containing specified keywords."""
+    updated_section = []
+    for entry in section:
+        sentences = re.split(r'(?<=\.) ', entry)
+        filtered_sentences = [s for s in sentences if not any(k.lower() in s.lower() for k in keywords)]
+        combined_entry = ' '.join(filtered_sentences).strip()
+        if combined_entry:
+            updated_section.append(combined_entry)
+    return updated_section
+
+def postprocess_section(section, keywords_to_exclude):
+    """Processes a section of notes."""
+    section = remove_sentences_with_keywords(section, keywords_to_exclude)
+    section = remove_duplicates(section)
+    section = sort_by_date(section)
+    section = combine_summaries_by_date(section)
+    return section
+
+def update_next_best_action(combined_output):
+    """Updates nextBestActions dynamically based on escalation severity and prescription content."""
+    escalationSeverity = combined_output.get('escalations', {}).get('escalationSeverity', '').strip().upper()
+    rxnumber = combined_output.get('rxNumber', '')
+    fill_number = re.search(r'-(\d{2})$', rxnumber)
+    fill_number = fill_number.group(1) if fill_number else "00"  # Default to "00" if not found
+
+    task_summary = combined_output.get('patientActivities', {}).get('taskSummary', [])
+    prescription = ''
+    if task_summary and isinstance(task_summary, list):
+        for task in task_summary:
+            if 'prescription' in task:
+                prescription = task['prescription']
+                break
+
+    prescription = (prescription or "").strip()
+    prescription = re.sub(r'[\s\u200b]+', ' ', prescription).upper()
+
+    account_keywords = {"FEP": "FEP", "SGM": "SGM", "HEMO": "HEMO", "NON-SGM": "NON-SGM","ONCOLOGY":"ONCOLOGY","NOVOLOGIX":"NOVOLOGIX","EXPEDITE":"EXPEDITE","NON-EPC":"NON-EXPEDITE","NON-FEP":"NON-FEP"}
+    action = None
+
+    if escalationSeverity == "VERY HIGH":
+        action = "Warmly transfer the patient call or connect with the Care/Resolution Team."
+    else:
+        for keyword, account_type in account_keywords.items():
+            if keyword.lower() in prescription.lower():
+                action = (
+                    f"This is a {account_type} account with fill {fill_number}.\n"
+                    f"{' ' * 20}The team will work on the request. BV team is not permitted to call the prescriber and initiate a follow-up at any time."
+                )
+                break
+
+    if action:
+        combined_output['nextBestActions'] = [action]
+    else:
+        combined_output['nextBestActions'] = [
+            act for act in combined_output.get('nextBestActions', []) if "PA TASKS" in act.upper()
+        ]
+    return combined_output
+
+def postprocess_combined_output(combined_output):
+    """Postprocess the combined output by applying sentence removal, duplicate removal, and date sorting."""
+    keywords_to_exclude_open_close_notes = ['PA Tasks', 'PA Task']
+    keywords_to_exclude_gen = [
+        'Inbound', 'outbound', 'Silverlink', 'automated call', 'IBC',
+        '<SM><FFT-PATIENT-CONTACT (NSM)>', '<SM><FFT-PA-NEEDED (NSM)>', '<SM><DOCTOR NO RESPONSE(SM)>'
+    ]
+    keywords_to_exclude_other_notes = ['GEN:', 'GEN -', 'BIL']
+
+    included_task_names = ["PA TASKS - ASSIGNED", "PA TASKS - UNASSIGNED", "PA TASK - ASSIGNED", "PA TASK - UNASSIGNED"]
+
+    task_summary = combined_output['patientActivities'].get('taskSummary', [])
+    
+    # Filter tasks
+    combined_output['patientActivities']['taskSummary'] = [
+        task for task in task_summary if task.get('taskName') in included_task_names
+    ]
+
+    # Clean up taskName here
+    for task in combined_output['patientActivities']['taskSummary']:
+        task['taskName'] = task['taskName'].split("-")[0].rstrip()
+
+        task['genNotesSummary'] = postprocess_section(task.get('genNotesSummary', []), keywords_to_exclude_gen)
+        task['bilNotesSummary'] = postprocess_section(task.get('bilNotesSummary', []), [])
+        task['inboundCommunicationSummary'] = postprocess_section(
+            task.get('inboundCommunicationSummary', []), ['GEN', 'BIL', 'outbound call', 'OAC']
+        )
+        task['outboundCommunicationSummary'] = postprocess_section(
+            task.get('outboundCommunicationSummary', []), ['GEN', 'BIL', 'inbound call', 'IBC']
+        )
+        task['insuranceInformation'] = postprocess_section(task.get('insuranceInformation', []), [])
+
+        if 'otherNotesSummary' in task:
+            del task['otherNotesSummary']
+
+    combined_output['patientActivities']['shipmentsSummary'] = postprocess_section(
+        combined_output['patientActivities'].get('shipmentsSummary', []), []
+    )
+
+    combined_output['patientActivities']['openTasksSummary'] = postprocess_section(
+        combined_output['patientActivities'].get('openTasksSummary', []), keywords_to_exclude_open_close_notes
+    )
+
+    if 'otherNotesSummary' in combined_output['patientActivities']:
+        combined_output['patientActivities']['otherNotesSummary'] = postprocess_section(
+            combined_output['patientActivities']['otherNotesSummary'], keywords_to_exclude_other_notes
+        )
+
+    combined_output = update_next_best_action(combined_output)
+    return combined_output
+
+# =======================
+#    Pydantic Models
+# =======================
+
+class Note(BaseModel):
+    noteId: str
+    systemSrcCd: str
+    acctNo: str
+    patientId: Optional[str]
+    noteSummaryTxt: str
+    noteTxt: str
+    noteTypeCd: str
+    noteTypeInd: str
+    deactivateInd: str
+    deactivateDt: str
+    deactivateReasonCd: str
+    deactivateUser: str
+    reclasifyInd: str
+    systemGeneratedInd: str
+    svcDt: str
+    typePlan: str
+    createDate: str
+    createBy: str
+    updateDt: Optional[str]
+    updateBy: Optional[str]
+    reclassifyDt: Optional[str]
+    reclassifyBy: Optional[str]
+    notesEditCount: Optional[str]
+    noteCnt: str
+
+
+class TaskDisposition(BaseModel):
+    tskAction: str
+    tskOutcome: str
+    userComment: str
+    byUser: str
+    dispId: str
+    dateAndTime: str
+
+
+class TaskHistory(BaseModel):
+    finalDisplayEntityId: str
+    sbpentytyp: str
+    queueName: str
+    bpmTasknm: str
+    drugName: str
+    alertMessage: str
+    finalTasksource: str
+    taskCrtets: str
+    lastDispts: str
+    theFinalUsername: str
+    visualIndicatorDisplay: str
+    sbpWrkquetaskbpmTaskid: str
+    bpmTaskinstanceId: str
+    taskCreationComments: str
+    isManual: str
+    taskFlupts: str
+    taskSource: str
+    taskCrteusrnm: str
+    prcscrteusrnm: str
+    prntdispdata: str
+    prntprcsmapid: str
+    prntdispcrtets: str
+    actionType: str
+    prnttaskprcsnm: str
+    prntbpmtaskchildbpmtask: str
+    abbrevfoundinmapping: str
+    acctNo: str
+    taskStatus: str
+    taskDisposition: Optional[List[TaskDisposition]] = []
+
+class PatientShipment(BaseModel):
+    shipmentNumber: str
+    shipmentStatus:str
+    shippedDate:str
+    shippedSite:str
+    trackingSbr:str
+    service:str
+    orderNumber:str
+    cntLinesInOrder:str
+    drugInfo:str
+    tltDeliveryStatus:str
+    accountNumber:str
+    patientId:str
+    patientLastName:str
+    deliveryDate:str
+    carrierCompany:str
+    exceptionReason:str
+    sprxOrderNo:str
+    needsDt:str
+    ordrByDt:str
+
+class patientContactHistory(BaseModel):
+    acctNo:str
+    attemptContactDttm:str
+    org:str
+    reason:str
+    callUser:str
+    inOut:str
+    addtlInfo:str
+
+
+class InputModel(BaseModel):
+    patientId: int
+    patientNoteList: List[Note]
+    patientTaskHistoryList: Optional[List[TaskHistory]] = []
+    PatientShipmentList: Optional[List[PatientShipment]] = []
+    patientContactHistoryList: Optional[List[patientContactHistory]] = []
+
+
+# =======================
+#    FastAPI App
+# =======================
+
+app = FastAPI()
+
+# @app.post("/postprocessing/")
+@router.post("/postprocessing")
+async def process_data(input_data: InputModel):
+    """
+    Processes the input data and interacts with the x42 API using predefined prompt IDs.
+    """
+    try:
+        ip = input_data.model_dump()  # Convert input to a dictionary
+        prompt_ids = {
+            "gen_and_bil": "5a0fc246-7d23-40a4-82f5-04b9ff2f560e370",
+            "ibc_and_obc": "9518af52-72cd-48d4-be65-4aca185ae4c1791",
+            "task_trigger": "8b15813b-b986-4a13-b13e-755dd83ef9b5901",
+            "open_closed": "7318a60a-be8a-4125-8047-59f9d4aeb882667",
+            "shipment_other": "a31c2dd8-0dc2-4dd9-911b-2faa3056d182517",
+        }
+
+        async def fetch_output(key, prompt_id):
+            payload = {
+                "prompt_id": prompt_id,
+                "additional_data": {
+                    "query": json.dumps(ip),
+                    "type": "pa_task",
+                },
+            }
+            output = await call_x42(payload)
+            if "error" in output:
+                return key, output["error"]
+            else:
+                return key, extract_json(output.get("chat_response", ""))
+
+        # Run all API calls in parallel
+        tasks = [fetch_output(key, prompt_id) for key, prompt_id in prompt_ids.items()]
+        results = await asyncio.gather(*tasks)
+
+        # Aggregate results
+        outputs = {key: result for key, result in results}
+
+        task_type = ['PA TASKS - ASSIGNED', 'PA TASKS - UNASSIGNED','PA TASK - ASSIGNED','PA TASK - UNASSIGNED']
+        outputs = filter_tasks_by_type(outputs, task_type)
+        
+        bill_and_gen = outputs["gen_and_bil"]
+        ibc_obc = outputs["ibc_and_obc"]
+        trigger = outputs["task_trigger"]
+        open_closed = outputs["open_closed"]
+        shipment_other = outputs["shipment_other"]
+        
+        final_combined_output = combine_outputs(bill_and_gen, trigger, ibc_obc, open_closed, shipment_other)
+        final_combined_output = postprocess_combined_output(final_combined_output)
+        
+        outputs = final_combined_output
+        return outputs
+
+    except ValidationError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+
