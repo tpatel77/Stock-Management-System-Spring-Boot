@@ -95,3 +95,84 @@ public class DuplicateRemover {
         System.out.println(result);
     }
 }
+
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+@SpringBootApplication
+public class NoteSorterApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(NoteSorterApplication.class, args);
+
+        // Example usage
+        List<String> notesList = List.of(
+            "01/05/2022: Note one",
+            "12/25/2021: Note two",
+            "05/10/2023: Note three"
+        );
+
+        List<String> sortedNotes = sortByDate(notesList);
+        System.out.println(sortedNotes);
+    }
+
+    public static List<String> sortByDate(List<String> notesList) {
+        // List to store parsed dates and notes
+        List<NoteWithDate> noteWithDateList = new ArrayList<>();
+
+        // Pattern for MM/DD/YYYY format
+        Pattern datePattern = Pattern.compile("\\b\\d{2}/\\d{2}/\\d{4}\\b");
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+
+        // Parse dates and add to the list
+        for (String note : notesList) {
+            Matcher matcher = datePattern.matcher(note);
+            if (matcher.find()) {
+                try {
+                    LocalDate parsedDate = LocalDate.parse(matcher.group(), dateFormatter);
+                    noteWithDateList.add(new NoteWithDate(parsedDate, note));
+                } catch (DateTimeParseException e) {
+                    // Skip notes with invalid dates
+                }
+            }
+        }
+
+        // Sort by date in reverse chronological order
+        return noteWithDateList.stream()
+                .sorted(Comparator.comparing(NoteWithDate::getDate).reversed())
+                .map(NoteWithDate::getNote)
+                .collect(Collectors.toList());
+    }
+
+    // Helper class to store notes with parsed dates
+    static class NoteWithDate {
+        private final LocalDate date;
+        private final String note;
+
+        public NoteWithDate(LocalDate date, String note) {
+            this.date = date;
+            this.note = note;
+        }
+
+        public LocalDate getDate() {
+            return date;
+        }
+
+        public String getNote() {
+            return note;
+        }
+    }
+}
+
