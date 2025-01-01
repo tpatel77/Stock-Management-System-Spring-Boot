@@ -239,3 +239,101 @@ public class NoteCombinerApplication {
         return combinedNotes;
     }
 }
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@SpringBootApplication
+public class NextBestActionApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(NextBestActionApplication.class, args);
+
+        // Example usage
+        Map<String, Object> combinedOutput = new HashMap<>();
+        combinedOutput.put("escalations", Map.of("escalationSeverity", "VERY HIGH"));
+        combinedOutput.put("rxNumber", "RX-12345-02");
+        combinedOutput.put("patientActivities", Map.of("taskSummary", List.of(
+            Map.of("prescription", "FEP prescription")
+        )));
+        combinedOutput.put("nextBestActions", List.of("PA TASKS: Example"));
+
+        Map<String, Object> updatedOutput = updateNextBestAction(combinedOutput);
+        System.out.println(updatedOutput);
+    }
+
+    public static Map<String, Object> updateNextBestAction(Map<String, Object> combinedOutput) {
+        // Extract escalation severity
+        String escalationSeverity = Optional.ofNullable((String) ((Map<?, ?>) combinedOutput.get("escalations"))
+                .getOrDefault("escalationSeverity", ""))
+                .orElse("").trim().toUpperCase();
+
+        // Extract rxNumber and fill number
+        String rxNumber = (String) combinedOutput.getOrDefault("rxNumber", "");
+        Pattern fillNumberPattern = Pattern.compile("-(\\d{2})$");
+        Matcher fillNumberMatcher = fillNumberPattern.matcher(rxNumber);
+        String fillNumber = fillNumberMatcher.find() ? fillNumberMatcher.group(1) : "00";
+
+        // Extract prescription
+        List<Map<String, String>> taskSummary = (List<Map<String, String>>) ((Map<?, ?>) combinedOutput
+                .getOrDefault("patientActivities", Map.of()))
+                .getOrDefault("taskSummary", Collections.emptyList());
+
+        String prescription = taskSummary.stream()
+                .filter(task -> task.containsKey("prescription"))
+                .map(task -> task.get("prescription"))
+                .findFirst()
+                .orElse("")
+                .trim()
+                .replaceAll("[\\s\\u200B]+", " ")
+                .toUpperCase();
+
+        // Define account keywords
+        Map<String, String> accountKeywords = Map.of(
+                "FEP", "FEP",
+                "SGM", "SGM",
+                "HEMO", "HEMO",
+                "NON-SGM", "NON-SGM",
+                "ONCOLOGY", "ONCOLOGY",
+                "NOVOLOGIX", "NOVOLOGIX",
+                "EXPEDITE", "EXPEDITE",
+                "NON-EPC", "NON-EXPEDITE",
+                "NON-FEP", "NON-FEP"
+        );
+
+        // Determine action
+        String action = null;
+        if ("VERY HIGH".equals(escalationSeverity)) {
+            action = "Warmly transfer the patient call or connect with the Care/Resolution Team.";
+        } else {
+            for (Map.Entry<String, String> entry : accountKeywords.entrySet()) {
+                if (prescription.toLowerCase().contains(entry.getKey().toLowerCase())) {
+                    action = String.format(
+                            "This is a %s account with fill %s.%n" +
+                            "                    The team will work on the request. BV team is not permitted to call the prescriber and initiate a follow-up at any time.",
+                            entry.getValue(), fillNumber
+                    );
+                    break;
+                }
+            }
+        }
+
+        // Update nextBestActions
+        if (action != null) {
+            combinedOutput.put("nextBestActions", List.of(action));
+        } else {
+            List<String> nextBestActions = ((List<String>) combinedOutput.getOrDefault("nextBestActions", List.of()));
+            combinedOutput.put("nextBestActions", nextBestActions.stream()
+                    .filter(act -> act.toUpperCase().contains("PA TASKS"))
+                    .toList());
+        }
+
+        return combinedOutput;
+    }
+}
+
