@@ -2593,3 +2593,44 @@ public class CombinedOutputProcessorApplication {
   ]
 }
 
+
+data = {
+    "patientId": 11669208,
+    "taskName": "PA_TASK",
+    "patientNoteList": [
+        {
+            "noteId": "2148897444",
+            "systemSrcCd": "HBS",
+            "acctNo": "10205873",
+            "patientId": "null",
+            "noteSummaryTxt": "SGM BLD CC $6.00 AUTH #f5D2SYjAnyZi111601",
+            "noteTxt": ("User: DSPARCS<<lf>>Method of Payment: CREDIT CARD<<lf>>"
+                        "Authorization Number: f5D2SYjAnyZi111601<<lf>>Total billed: $6.00<<lf>>"
+                        "Status: BLD CC $6.00 AUTH #f5D2SYjAnyZi111601<<lf>>TRANSACTIONS:<<lf>>"
+                        "11/21/2024, KIONEX SOD SUSP, $6.00<<lf>>"),
+            # ... more keys
+        },
+        # ... more notes
+    ],
+    # ... other keys like patientContactHistoryList, patientShipmentList, etc.
+}
+
+keywords = ['FEP', 'SGM']
+
+def find_keywords(obj, keywords):
+    found = set()
+    if isinstance(obj, dict):
+        for value in obj.values():
+            found.update(find_keywords(value, keywords))
+    elif isinstance(obj, list):
+        for item in obj:
+            found.update(find_keywords(item, keywords))
+    elif isinstance(obj, str):
+        for kw in keywords:
+            if kw in obj:
+                found.add(kw)
+    return found
+
+result = list(find_keywords(data, keywords))
+print("Found keywords:", result)
+
