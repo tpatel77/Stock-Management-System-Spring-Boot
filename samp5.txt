@@ -2634,3 +2634,64 @@ def find_keywords(obj, keywords):
 result = list(find_keywords(data, keywords))
 print("Found keywords:", result)
 
+
+
+
+
+data = {
+    "patientId": 11669208,
+    "taskName": "PA_TASK",
+    "patientNoteList": [
+        {
+            "noteId": "2148897444",
+            "systemSrcCd": "HBS",
+            "acctNo": "10205873",
+            "patientId": "null",
+            "noteSummaryTxt": "SGM BLD CC $6.00 AUTH #f5D2SYjAnyZi111601",
+            "noteTxt": "User: DSPARCS<<lf>>Method of Payment: CREDIT CARD<<lf>>Authorization Number: f5D2SYjAnyZi111601<<lf>>Total billed: $6.00<<lf>>Status: BLD CC $6.00 AUTH #f5D2SYjAnyZi111601<<lf>>TRANSACTIONS:<<lf>>11/21/2024, KIONEX SOD SUSP, $6.00<<lf>>",
+            "noteTypeCd": "INV",
+            "noteTypeInd": "INVOICING",
+            "deactivateInd": "N",
+            "deactivateDt": "NONE",
+            "deactivateReasonCd": "NONE",
+            "deactivateUser": "NONE",
+            "reclasifyInd": "N",
+            "systemGeneratedInd": "Y",
+            "svcDt": "11/21/2024 12:00:00 AM",
+            "typePlan": "SLF-SLF",
+            "createDate": "01/16/2025 12:10:32 AM",
+            "createBy": "DSPARCS",
+            "updateDt": "NONE",
+            "updateBy": "NONE",
+            "reclassifyDt": "NONE",
+            "reclassifyBy": "NONE",
+            "notesEditCount": "NONE",
+            "noteCnt": "42"
+        },
+        # ... other note objects ...
+    ],
+    # ... other keys in the dictionary ...
+}
+
+keywords = ['FEP', 'SGM']
+found_keywords = set()
+
+def search_keywords(obj):
+    if isinstance(obj, dict):
+        for value in obj.values():
+            search_keywords(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            search_keywords(item)
+    elif isinstance(obj, str):
+        lower_text = obj.lower()
+        for kw in keywords:
+            if kw.lower() in lower_text:
+                found_keywords.add(kw)
+    # other types (int, float, etc.) are ignored
+
+search_keywords(data)
+
+# Convert the set to list to see the result
+result = list(found_keywords)
+print(result)
