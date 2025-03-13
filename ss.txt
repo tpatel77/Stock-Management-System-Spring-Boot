@@ -93,3 +93,116 @@ class LoggerUtil:
                 cls._logger.debug(formatted_message)
             case _:  # ENTRY, EXIT, INFO
                 cls._logger.info(formatted_message)
+
+
+
+
+############################################################
+import logging
+import sys
+import json
+import inspect
+from datetime import datetime
+from src.common.models.CvsEventEnum import CvsEventEnum
+from src.common.models.ResourceExecutionStats import ResourceExecutionStats
+from src.summary.util.context_util import get_request_execution_ctx
+
+# Custom LoggerAdapter to add the parent's method name into the log record.
+class ParentLoggerAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        # The parent method is typically the caller of the LoggerUtil.logMessage() method.
+        parent_frame = inspect.stack()[2]
+        parent_method = parent_frame.function
+        extra = kwargs.get('extra', {})
+        extra['parentMethod'] = parent_method
+        kwargs['extra'] = extra
+        return msg, kwargs
+
+class LoggerUtil:
+    _logger = None
+    LONGEST_EVENT = max(len(e.value) for e in CvsEventEnum)
+
+    @classmethod
+    def initialize(cls):
+        if cls._logger is None:
+            # Configure logging with file name and parent method included.
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] [Parent: %(parentMethod)s] - %(message)s',
+                handlers=[
+                    logging.StreamHandler(sys.stdout),
+                    logging.FileHandler('logs/application.log')
+                ]
+            )
+            # Wrap our logger in the ParentLoggerAdapter so that each log record includes the parent method.
+            cls._logger = ParentLoggerAdapter(logging.getLogger('cvs_event_logger'), {})
+
+    @classmethod
+    def _format_field(cls, name: str, value: str) -> str:
+        """Format a field with consistent spacing"""
+        return f'"{name}": "{value}"'
+
+    @classmethod
+    def _format_object_field(cls, name: str) -> str:
+        """Format an object field with consistent spacing"""
+        return f'"{name}": {{}}'
+
+    @classmethod
+    def _format_number_field(cls, name: str, value: int) -> str:
+        """Format a number field with consistent spacing"""
+        return f'"{name}": {value}'
+
+    @classmethod
+    def _get_formatted_message(cls, event_type: CvsEventEnum, message: str) -> str:
+        """Get formatted message with execution context"""
+        try:
+            res = get_request_execution_ctx()
+            if res is None:
+                res = ResourceExecutionStats()
+
+            # Format each field consistently
+            fields = [
+                cls._format_field("CVSEVENT", event_type.value.ljust(cls.LONGEST_EVENT)),
+                cls._format_field("grid", res.grid or ""),
+                cls._format_field("desc", message),
+                cls._format_object_field("metrics"),
+                cls._format_object_field("tags"),
+                cls._format_object_field("methodStats"),
+                cls._format_field("statusCde", ""),
+                cls._format_field("statusMsg", ""),
+                cls._format_number_field("httpStatusCde", 200),
+                cls._format_field("httpMethod", "POST"),
+                cls._format_number_field("reqLength", 16),
+                cls._format_field("startTime", datetime.now().isoformat()),
+                cls._format_field("appName", "spl-domain-py-notessummary")
+            ]
+            
+            # Join fields with comma and space
+            return "{" + ", ".join(fields) + "}"
+            
+        except Exception as e:
+            # Fallback with same formatting
+            fields = [
+                cls._format_field("CVSEVENT", event_type.value.ljust(cls.LONGEST_EVENT)),
+                cls._format_field("grid", ""),
+                cls._format_field("desc", message),
+                cls._format_field("startTime", datetime.now().isoformat()),
+                cls._format_field("appName", "spl-domain-py-notessummary")
+            ]
+            return "{" + ", ".join(fields) + "}"
+
+    @classmethod
+    def logMessage(cls, event: CvsEventEnum, message: str) -> None:
+        """Log a message with the given event type and execution context"""
+        if cls._logger is None:
+            cls.initialize()
+        
+        formatted_message = cls._get_formatted_message(event, message)
+        
+        match event:
+            case CvsEventEnum.ERROR:
+                cls._logger.error(formatted_message)
+            case CvsEventEnum.DEBUG:
+                cls._logger.debug(formatted_message)
+            case _:  # ENTRY, EXIT, INFO
+                cls._logger.info(formatted_message)
