@@ -2697,3 +2697,51 @@ result = list(found_keywords)
 print(result)
 
  [{'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'SGM'}, {'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'Expedite'}, {'date': '11/21/2024', 'rxNumber': '15727324-00', 'type': 'Novologix'}, {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'Novologix'}, {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'SGM'}]
+
+
+from datetime import datetime
+
+# Input list of dictionaries
+data = [
+    {'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'SGM'},
+    {'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'Expedite'},
+    {'date': '11/21/2024', 'rxNumber': '15727324-00', 'type': 'Novologix'},
+    {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'Novologix'},
+    {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'SGM'}
+]
+
+# Dictionary to group items by rxNumber
+grouped = {}
+date_format = "%m/%d/%Y"
+
+for item in data:
+    rx = item['rxNumber']
+    date_str = item['date']
+    type_val = item['type']
+    # Convert the date string to a datetime object
+    dt = datetime.strptime(date_str, date_format)
+    
+    # Initialize group if not present
+    if rx not in grouped:
+        grouped[rx] = {'min_date': dt, 'types': {type_val}}
+    else:
+        # Update the minimum date if current date is earlier
+        if dt < grouped[rx]['min_date']:
+            grouped[rx]['min_date'] = dt
+        grouped[rx]['types'].add(type_val)
+
+# Build the output list based on the grouping
+output = []
+for rx, info in grouped.items():
+    # Format the minimum date back to string
+    min_date_str = info['min_date'].strftime(date_format)
+    # Join the unique types in a sorted order (alphabetically)
+    types_str = ", ".join(sorted(info['types']))
+    # Create the formatted output string
+    output.append({
+        'rxNumber': rx,
+        'type': f"{min_date_str} Rx Type {types_str}"
+    })
+
+print(output)
+
