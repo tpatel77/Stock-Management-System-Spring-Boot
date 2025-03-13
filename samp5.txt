@@ -2695,3 +2695,5 @@ search_keywords(data)
 # Convert the set to list to see the result
 result = list(found_keywords)
 print(result)
+
+ [{'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'SGM'}, {'date': '11/22/2024', 'rxNumber': '15727324-00', 'type': 'Expedite'}, {'date': '11/21/2024', 'rxNumber': '15727324-00', 'type': 'Novologix'}, {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'Novologix'}, {'date': '01/15/2025', 'rxNumber': '15727324-00', 'type': 'SGM'}]
