@@ -1,0 +1,29 @@
+name: Run CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - 'REL_*'
+      - 'DEV_*'
+    paths-ignore:
+      - 'deploy-configs/**'
+      - 'README.md'
+      - '.github/workflows/cd.yaml'
+
+jobs:
+  cicd:
+    uses: cvs-health-source-code/gha_workflow_actions/.github/workflows/gradle_docker.yaml@latest
+    secrets: inherit
+    with:
+      JAVA_VERSION: "21.0.3"
+      JAVA_BUILD_COMMAND: "./gradlew build"
+      JAVA_LINT_COMMAND: "echo \"Lint\""
+      SCA_TOOL: 'snyk' #Change to snyk when snyk issue is resolved --xray
+      SAST_TOOL: 'snyk'
+      CONTAINER_SCAN_TOOL: 'snyk'
+      SNYK_ORG: 'cvs-health-default'
+      ALL_PROJECTS_SNYK: 'true' #Validate
+      JAVA_DEPS_COMMAND: "./gradlew clean --refresh-dependencies"
+      DOCKER_REGISTRY_NAME: "cvsdigital-docker/specialty"
+      DOCKER_PUBLISH: true
