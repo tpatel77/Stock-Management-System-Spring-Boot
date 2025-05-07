@@ -206,3 +206,81 @@ class LoggerUtil:
                 cls._logger.debug(formatted_message)
             case _:  # ENTRY, EXIT, INFO
                 cls._logger.info(formatted_message)
+
+
+
+
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.*;
+
+public class YamlGenerator {
+
+    public static void main(String[] args) throws IOException {
+        // 1. Top‐level map
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("name", "Run CI Pipeline");
+
+        // 2. on.push.branches and paths-ignore
+        Map<String, Object> on = new LinkedHashMap<>();
+        Map<String, Object> push = new LinkedHashMap<>();
+        push.put("branches", Arrays.asList("main", "REL_*", "DEV_*"));
+        push.put("paths-ignore", Arrays.asList(
+                "deploy-configs/**",
+                "README.md",
+                ".github/workflows/cd.yaml"
+        ));
+        on.put("push", push);
+        root.put("on", on);
+
+        // 3. jobs.cicd
+        Map<String, Object> jobs = new LinkedHashMap<>();
+        Map<String, Object> cicd = new LinkedHashMap<>();
+
+        cicd.put("uses", "cvs-health-source-code/gha_workflow_actions/.github/workflows/gradle_docker.yaml@latest");
+        cicd.put("secrets", "inherit");
+
+        // 4. with: key/value map under jobs.cicd
+        Map<String, Object> with = new LinkedHashMap<>();
+        with.put("JAVA_VERSION", "21.0.3");
+        with.put("JAVA_BUILD_COMMAND", "./gradlew build");
+        with.put("JAVA_LINT_COMMAND", "echo \"Lint\"");
+        with.put("SCA_TOOL", "snyk");            // Change to snyk when snyk issue is resolved --xray
+        with.put("SAST_TOOL", "snyk");
+        with.put("CONTAINER_SCAN_TOOL", "snyk");
+        with.put("SNYK_ORG", "cvs-health-default");
+        with.put("ALL_PROJECTS_SNYK", "true");    // Validate
+        with.put("JAVA_DEPS_COMMAND", "./gradlew clean --refresh-dependencies");
+        with.put("DOCKER_REGISTRY_NAME", "cvsdigital-docker/specialty");
+        with.put("DOCKER_PUBLISH", Boolean.TRUE);
+
+        cicd.put("with", with);
+
+        jobs.put("cicd", cicd);
+        root.put("jobs", jobs);
+
+        // 5. Configure YAML options to match your desired formatting
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setIndent(2);
+        options.setPrettyFlow(true);
+        // Keep quotes around strings that need them
+        Representer representer = new Representer();
+        representer.getPropertyUtils().setSkipMissingProperties(true);
+
+        Yaml yaml = new Yaml(representer, options);
+
+        // 6. Write out to file
+        try (FileWriter writer = new FileWriter("workflow.yaml")) {
+            yaml.dump(root, writer);
+        }
+
+        System.out.println("Generated workflow.yaml");
+    }
+}
+
