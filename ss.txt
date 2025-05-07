@@ -284,3 +284,145 @@ public class YamlGenerator {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public class WorkflowYamlWriter {
+
+    /**
+     * Generates the GitHub Actions workflow YAML for “App Deployment”,
+     * using the provided map of filter-names to glob-patterns.
+     *
+     * @param filters map where
+     *                key   = the filter ID (e.g. "spl-rke-west-sit1_v1")
+     *                value = the glob to watch (e.g. "**/deploy-configs/spl-rke-west-sit1/values/v1.yaml")
+     */
+    public static String generateWorkflowYaml(Map<String, String> filters) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("name: App Deployment\n");
+        sb.append("on:\n");
+        sb.append("  workflow_dispatch:\n");
+        sb.append("  push:\n");
+        sb.append("    branches:\n");
+        sb.append("      #- GitHub-Actions\n");
+        sb.append("      #- develop-*\n");
+        sb.append("      #- dev*\n");
+        sb.append("      #- feature*\n");
+        sb.append("      #- main\n");
+        sb.append("    paths:\n");
+        sb.append("      - '**/deploy-configs/**/v1.yaml'\n\n");
+
+        sb.append("permissions:\n");
+        sb.append("  id-token: write\n");
+        sb.append("  contents: read\n");
+        sb.append("  pull-requests: write\n\n");
+
+        sb.append("jobs:\n");
+        sb.append("  detect-changes:\n");
+        sb.append("    runs-on:\n");
+        sb.append("      group: cvs-linux-self-hosted\n\n");
+        sb.append("    outputs:\n");
+        sb.append("      ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}\n");
+        sb.append("      HELM_FILE_VERSION: ${{ steps.set-env.outputs.HELM_FILE_VERSION }}\n\n");
+        sb.append("    steps:\n");
+        sb.append("      - name: Checkout\n");
+        sb.append("        uses: actions/checkout@v4\n");
+        sb.append("        with:\n");
+        sb.append("          fetch-depth: 0\n\n");
+        sb.append("      - name: Detect changes\n");
+        sb.append("        id: changes\n");
+        sb.append("        uses: dorny/paths-filter@v3\n");
+        sb.append("        with:\n");
+        sb.append("          base: ${{ github.ref_name }}\n");
+        sb.append("          filters: |\n");
+        // insert all filter entries here
+        filters.forEach((filterName, globPattern) -> {
+            sb.append("            ")
+              .append(filterName)
+              .append(":\n");
+            sb.append("              - '")
+              .append(globPattern)
+              .append("'\n");
+        });
+        sb.append("\n");
+        sb.append("      - name: Set Environment Variables\n");
+        sb.append("        id: set-env\n");
+        sb.append("        run: |\n");
+        sb.append("          \n");
+        // build the if/elif chain
+        boolean first = true;
+        for (String filterName : filters.keySet()) {
+            if (first) {
+                sb.append("          if [ \"${{ steps.changes.outputs.")
+                  .append(filterName)
+                  .append(" }}\" = \"true\" ]; then\n");
+                first = false;
+            } else {
+                sb.append("          elif [ \"${{ steps.changes.outputs.")
+                  .append(filterName)
+                  .append(" }}\" = \"true\" ]; then\n");
+            }
+            // derive ENV (strip after underscore if you like, or just reuse the key)
+            String envName = filterName.contains("_")
+                             ? filterName.substring(0, filterName.indexOf('_'))
+                             : filterName;
+            String version = filterName.contains("_")
+                             ? filterName.substring(filterName.lastIndexOf('_') + 1)
+                             : "v1";
+            sb.append("              echo \"ENV_NAME=")
+              .append(envName)
+              .append("\" >> $GITHUB_OUTPUT\n");
+            sb.append("              echo \"HELM_FILE_VERSION=")
+              .append(version)
+              .append("\" >> $GITHUB_OUTPUT\n");
+        }
+        sb.append("          fi\n\n");
+
+        sb.append("  deploy:\n");
+        sb.append("    uses: cvs-health-source-code/gitops-cd-workflow/.github/workflows/helm-deploy.yaml@v1\n");
+        sb.append("    needs: [ detect-changes ]\n");
+        sb.append("    secrets: inherit\n");
+        sb.append("    with:\n");
+        sb.append("      app-name: \"spl-domain-eventsprocessor-fmh\"\n");
+        sb.append("      environment: ${{ needs.detect-changes.outputs.ENV_NAME }}\n");
+        sb.append("      helm-template-repo: ${{ vars.HELM_TEMPLATE_REPO }}\n");
+        sb.append("      helm-file-version: ${{ needs.detect-changes.outputs.HELM_FILE_VERSION }}\n");
+        sb.append("      helm-template-branch: ${{ vars.HELM_TEMPLATE_BRANCH }}\n");
+        sb.append("      # helm-template-branch: v1.0.3\n");
+        sb.append("      canary-weight: \"0\"\n");
+
+        return sb.toString();
+    }
+
+    public static void main(String[] args) throws IOException {
+        // example customization:
+        Map<String, String> myFilters = new LinkedHashMap<>();
+        myFilters.put("spl-rke-west-sit1_v1", "**/deploy-configs/spl-rke-west-sit1/values/v1.yaml");
+        myFilters.put("spl-rke-west-sit2_v1", "**/deploy-configs/spl-rke-west-sit2/values/v1.yaml");
+        // you could add more (or remove) entries at runtime
+
+        String yaml = generateWorkflowYaml(myFilters);
+        System.out.println(yaml);
+
+        // optionally write to file:
+        try (FileWriter fw = new FileWriter("app-deploy-workflow.yaml")) {
+            fw.write(yaml);
+        }
+    }
+}
+
