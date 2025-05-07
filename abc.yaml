@@ -27,3 +27,76 @@ jobs:
       JAVA_DEPS_COMMAND: "./gradlew clean --refresh-dependencies"
       DOCKER_REGISTRY_NAME: "cvsdigital-docker/specialty"
       DOCKER_PUBLISH: true
+
+
+
+
+
+name: App Deployment
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      #- GitHub-Actions
+      #- develop-*
+      #- dev*
+      #- feature*
+      #- main
+    paths:
+      - '**/deploy-configs/**/v1.yaml'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    runs-on:
+      group: cvs-linux-self-hosted
+
+    outputs:
+      ENV_NAME: ${{ steps.set-env.outputs.ENV_NAME }}
+      HELM_FILE_VERSION: ${{ steps.set-env.outputs.HELM_FILE_VERSION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.ref_name }}
+          filters: |
+            spl-rke-west-sit1_v1:
+              - '**/deploy-configs/spl-rke-west-sit1/values/v1.yaml'
+            spl-rke-west-sit2_v1:
+              - '**/deploy-configs/spl-rke-west-sit2/values/v1.yaml'
+
+      - name: Set Environment Variables
+        id: set-env
+        run: |
+          
+          if [ "${{ steps.changes.outputs.spl-rke-west-sit1_v1 }}" = "true" ]; then
+              echo "ENV_NAME=spl-rke-west-sit1" >> $GITHUB_OUTPUT
+              echo "HELM_FILE_VERSION=v1" >> $GITHUB_OUTPUT    
+          elif [ "${{ steps.changes.outputs.spl-rke-west-sit2_v1 }}" = "true" ]; then
+              echo "ENV_NAME=spl-rke-west-sit2" >> $GITHUB_OUTPUT
+              echo "HELM_FILE_VERSION=v1" >> $GITHUB_OUTPUT 
+          fi
+
+  deploy:
+    uses: cvs-health-source-code/gitops-cd-workflow/.github/workflows/helm-deploy.yaml@v1
+    needs: [ detect-changes ]
+    secrets: inherit
+    with:
+      app-name: "spl-domain-eventsprocessor-fmh"
+      environment: ${{ needs.detect-changes.outputs.ENV_NAME }}
+      helm-template-repo: ${{ vars.HELM_TEMPLATE_REPO }}
+      helm-file-version: ${{ needs.detect-changes.outputs.HELM_FILE_VERSION }}
+      helm-template-branch: ${{ vars.HELM_TEMPLATE_BRANCH }}
+      # helm-template-branch: v1.0.3
+      canary-weight: "0"
