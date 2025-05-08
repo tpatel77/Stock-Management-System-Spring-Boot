@@ -531,3 +531,72 @@ public class GitHubService {
 
 }
 
+
+
+
+
+
+package com.example.githubautomation.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+
+@Service
+public class GitHubService {
+
+    private static final String GITHUB_API_URL = "https://api.github.com/repos/";
+
+    @Value("${github.token}")
+    private String githubToken;  // GitHub Token from environment variable or properties
+
+    @Value("${github.repo.owner}")
+    private String repoOwner;  // Repository owner (user or organization)
+
+    @Value("${github.repo.name}")
+    private String repoName;  // Repository name
+
+    private final RestTemplate restTemplate;
+
+    public GitHubService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    // Method to set protection rules to prevent self-approval and require other reviewers
+    public void setEnvironmentProtectionRules(String environmentName, List<String> requiredApprovers) {
+        String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/environments/" + environmentName + "/protection_rules";
+
+        // Construct the JSON payload with multiple reviewers (users or teams)
+        StringBuilder reviewersList = new StringBuilder("[");
+        for (int i = 0; i < requiredApprovers.size(); i++) {
+            reviewersList.append("\"").append(requiredApprovers.get(i)).append("\"");
+            if (i < requiredApprovers.size() - 1) {
+                reviewersList.append(", ");
+            }
+        }
+        reviewersList.append("]");
+
+        // JSON payload to configure protection rules
+        String jsonPayload = String.format("{\"required_approving_reviewers\": {\"users\": %s}}", reviewersList.toString());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + githubToken);
+        headers.set("Accept", "application/vnd.github.v3+json");
+
+        HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
+
+        // Send PUT request to set protection rules
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            System.out.println("Protection rules set for environment: " + environmentName);
+        } else {
+            System.err.println("Error setting protection rules: " + response.getStatusCode());
+        }
+    }
+}
