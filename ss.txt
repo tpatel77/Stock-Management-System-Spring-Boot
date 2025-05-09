@@ -783,3 +783,87 @@ public class GitHubService {
         }
     }
 }
+
+
+
+package com.example.githubautomation.service;
+
+import com.example.githubautomation.util.EncryptionUtil;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+@Service
+public class GitHubService {
+
+    private static final String GITHUB_API_URL = "https://api.github.com/repos/";
+
+    @Value("${github.token}")
+    private String githubToken;
+
+    @Value("${github.repo.owner}")
+    private String repoOwner;
+
+    @Value("${github.repo.name}")
+    private String repoName;
+
+    private final RestTemplate restTemplate;
+
+    public GitHubService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    // Method to fetch the public key for encrypting the secret
+    public String getPublicKey() {
+        String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/actions/secrets/public-key";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + githubToken);
+        headers.set("Accept", "application/vnd.github.v3+json");
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        // Send GET request to fetch public key
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            String publicKey = response.getBody();
+            // You should extract the public key from the JSON response and return it.
+            return publicKey;
+        } else {
+            System.err.println("Error fetching public key: " + response.getStatusCode());
+            return null;
+        }
+    }
+
+    // Method to set repository secret
+    public void setRepositorySecret(String secretName, String secretValue) throws Exception {
+        String publicKey = getPublicKey();
+        if (publicKey != null) {
+            // Encrypt the secret using the public key
+            String encryptedSecret = EncryptionUtil.encryptWithRSA(secretValue, publicKey);
+
+            String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/actions/secrets/" + secretName;
+
+            // Construct the JSON payload
+            String jsonPayload = String.format("{\"encrypted_value\": \"%s\", \"key_id\": \"%s\"}", encryptedSecret, "public_key_id");
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + githubToken);
+            headers.set("Accept", "application/vnd.github.v3+json");
+
+            HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
+
+            // Send PUT request to set repository secret
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful()) {
+                System.out.println("Repository secret set: " + secretName);
+            } else {
+                System.err.println("Error setting repository secret: " + response.getStatusCode());
+            }
+        }
+    }
+}
