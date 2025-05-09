@@ -685,3 +685,101 @@ public class GitHubService {
     }
 }
 
+
+
+package com.example.githubautomation.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+@Service
+public class GitHubService {
+
+    private static final String GITHUB_API_URL = "https://api.github.com/repos/";
+
+    @Value("${github.token}")
+    private String githubToken;  // GitHub Token from environment variable or properties
+
+    @Value("${github.repo.owner}")
+    private String repoOwner;  // Repository owner (user or organization)
+
+    @Value("${github.repo.name}")
+    private String repoName;  // Repository name
+
+    private final RestTemplate restTemplate;
+
+    public GitHubService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    // Method to set repository variables
+    public void setRepositoryVariable(String variableName, String value) {
+        String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/actions/variables";
+
+        String jsonPayload = String.format("{\"name\": \"%s\", \"value\": \"%s\"}", variableName, value);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + githubToken);
+        headers.set("Accept", "application/vnd.github.v3+json");
+
+        HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
+
+        // Send POST request to set repository variable
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            System.out.println("Repository variable set: " + variableName);
+        } else {
+            System.err.println("Error setting repository variable: " + response.getStatusCode());
+        }
+    }
+
+    // Method to set repository secrets (requires encryption)
+    public void setRepositorySecret(String secretName, String secretValue, String keyId, String encryptedSecretValue) {
+        String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/actions/secrets/" + secretName;
+
+        String jsonPayload = String.format("{\"encrypted_value\": \"%s\", \"key_id\": \"%s\"}", encryptedSecretValue, keyId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + githubToken);
+        headers.set("Accept", "application/vnd.github.v3+json");
+
+        HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
+
+        // Send PUT request to set repository secret
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            System.out.println("Repository secret set: " + secretName);
+        } else {
+            System.err.println("Error setting repository secret: " + response.getStatusCode());
+        }
+    }
+
+    // Method to get the public key used for encrypting secrets
+    public String getPublicKey() {
+        String url = GITHUB_API_URL + repoOwner + "/" + repoName + "/actions/secrets/public-key";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + githubToken);
+        headers.set("Accept", "application/vnd.github.v3+json");
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        // Send GET request to fetch public key
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            // Parse the public key from the response
+            String publicKey = response.getBody(); // You'll need to extract the key from the response.
+            System.out.println("Public Key: " + publicKey);
+            return publicKey;
+        } else {
+            System.err.println("Error fetching public key: " + response.getStatusCode());
+            return null;
+        }
+    }
+}
