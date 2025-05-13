@@ -916,3 +916,45 @@ public void loadBundledSodium() throws IOException {
         System.load(tmp.toAbsolutePath().toString());
     }
 }
+
+
+
+
+import com.sun.jna.Platform;
+
+public class JnaPlatformDetector {
+
+    /**
+     * Returns the name of the resource folder JNA will look in for bundled libraries,
+     * e.g. "linux-x86-64", "linux-amd64", "windows-x86-64", "darwin-arm64", etc.
+     */
+    public static String detectPlatformDir() {
+        String osPart;
+        if (Platform.isWindows()) {
+            osPart = "windows";
+        } else if (Platform.isMac()) {
+            osPart = "darwin";
+        } else if (Platform.isLinux()) {
+            osPart = "linux";
+        } else {
+            throw new IllegalStateException("Unsupported OS: " + System.getProperty("os.name"));
+        }
+
+        String arch = System.getProperty("os.arch").toLowerCase();
+        String archPart;
+        // map common JVM arch names to JNA folder conventions
+        if (arch.contains("amd64") || arch.contains("x86_64")) {
+            // JNA historically uses both "amd64" and "x86-64" directories;
+            // pick the one you’ve packaged
+            archPart = "amd64";
+        } else if (arch.contains("aarch64") || arch.contains("arm64")) {
+            archPart = "arm64";
+        } else if (arch.contains("86")) {
+            archPart = "x86";
+        } else {
+            archPart = arch;  // fallback to raw value
+        }
+
+        return osPart + "-" + archPart;
+    }
+}
