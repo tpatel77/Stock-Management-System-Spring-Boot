@@ -899,3 +899,20 @@ public class EncryptionUtil {
         return Base64.getEncoder().encodeToString(encryptedBytes);
     }
 }
+
+
+
+
+@PostConstruct
+public void loadBundledSodium() throws IOException {
+    String platformDir = detectPlatformDir();   // e.g. "linux-x86-64"
+    String resource = "/" + platformDir + "/libsodium.so";
+    try (InputStream in = getClass().getResourceAsStream(resource)) {
+        if (in == null) {
+            throw new IllegalStateException("No resource: " + resource);
+        }
+        Path tmp = Files.createTempFile("libsodium", ".so");
+        Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+        System.load(tmp.toAbsolutePath().toString());
+    }
+}
