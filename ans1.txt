@@ -1,4 +1,5 @@
 name: Run Non Main CI Pipeline
+
 on:
   push:
     branches:
@@ -8,29 +9,22 @@ on:
     paths-ignore:
       - deploy-configs/**
       - README.md
-      - .github/workflows/cd.yaml
+      - .github/workflows/run-non-main-ci-pipeline.yaml
 
 jobs:
   cicd:
+    name: Run CI/CD
     uses: cvs-health-source-code/gha_workflow_actions/.github/workflows/gradle_docker.yaml@latest
     secrets: inherit
     with:
-      # runner selection (defaults to self-hosted if omitted)
-      RUNS_ON: self-hosted
-
-      # Java settings
       JAVA_VERSION: 21.0.3
       JAVA_BUILD_COMMAND: ./gradlew build
       JAVA_LINT_COMMAND: echo "Lint"
-
-      # security tools
       SCA_TOOL: snyk
       SAST_TOOL: snyk
       CONTAINER_SCAN_TOOL: snyk
       SNYK_ORG: cvs-health-default
       ALL_PROJECTS_SNYK: 'true'
-
-      # docker registry
       DOCKER_REGISTRY_NAME: cvsdigital-docker/specialty
 
   update-deployment-config:
@@ -40,16 +34,22 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: cvs-health-source-code/gha_workflow_actions/.github/actions/update-deployment-config@latest
-    with:
-      # composite action inputs
-      type: harness
-      build_type: gradle
-      DEPLOY_FILE: scripts/deploy.yaml
-      IMAGE_PR_REFRESH_TIMEOUT: 30
-      IMAGE_PR_SLEEP_TIMEOUT: 20
-      SKIP_SEMANTIC: 'false'
-      APP_ID: ${{ secrets.GHA_WORKFLOW_APP_ID }}
-      PRIVATE_KEY: ${{ secrets.GHA_WORKFLOW_APP_PRIVATE_KEY }}
-      HOTFIX_RELEASE: 'false'
-      HOTFIX_RELEASE_BRANCH: hotfix
+    steps:
+      # if your action needs source files, check out first
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Update Deployment Config
+        uses: cvs-health-source-code/update-deploy-configs/.github/actions/update-deployment-config@main
+        with:
+          type: harness
+          build_type: gradle
+          DEPLOY_FILE: scripts/deploy.yaml
+          IMAGE_PR_REFRESH_TIMEOUT: 30
+          IMAGE_PR_SLEEP_TIMEOUT: 20
+          SKIP_SEMANTIC: 'false'
+          APP_ID: ${{ secrets.GHA_WORKFLOW_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.GHA_WORKFLOW_APP_PRIVATE_KEY }}
+          IMAGE_TAG_VERSION: ${{ needs.cicd.outputs.release_tag }}
+          HOTFIX_RELEASE: 'false'
+          HOTFIX_RELEASE_BRANCH: hotfix
