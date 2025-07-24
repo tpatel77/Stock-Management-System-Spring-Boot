@@ -1,0 +1,98 @@
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.*;
+import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
+import reactor.util.retry.Retry;
+
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+@Configuration
+public class WebClientConfig {
+
+    @Bean
+    public WebClient webClient() {
+        ConnectionProvider connectionProvider = ConnectionProvider.builder("custom-pool")
+                .maxConnections(100)
+                .pendingAcquireTimeout(Duration.ofSeconds(5))
+                .maxIdleTime(Duration.ofSeconds(30))
+                .maxLifeTime(Duration.ofMinutes(5))
+                .build();
+
+        HttpClient httpClient = HttpClient.create(connectionProvider)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000) // 10s connection timeout
+                .responseTimeout(Duration.ofSeconds(30))
+                .doOnConnected(conn ->
+                        conn.addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
+                            .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)))
+                .protocol(io.netty.handler.ssl.ApplicationProtocolConfig.Protocol.HTTP11);
+
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .filter(logRequest())
+                .filter(logResponse())
+                .filter(errorHandler())  // Global error handling filter
+                .build();
+    }
+
+    // Log outgoing requests
+    private ExchangeFilterFunction logRequest() {
+        return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
+            System.out.println(">>> Request: " + clientRequest.method() + " " + clientRequest.url());
+            return Mono.just(clientRequest);
+        });
+    }
+
+    // Log incoming responses
+    private ExchangeFilterFunction logResponse() {
+        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+            System.out.println("<<< Response Status: " + clientResponse.statusCode());
+            return Mono.just(clientResponse);
+        });
+    }
+
+    // Global Error Handler
+    private ExchangeFilterFunction errorHandler() {
+        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+            if (clientResponse.statusCode().is4xxClientError()) {
+                return clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new ClientException(
+                                "Client Error: " + clientResponse.statusCode() + " - " + errorBody
+                        )));
+            } else if (clientResponse.statusCode().is5xxServerError()) {
+                return clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new ServerException(
+                                "Server Error: " + clientResponse.statusCode() + " - " + errorBody
+                        )));
+            }
+            return Mono.just(clientResponse);
+        });
+    }
+
+    // Retry strategy for transient errors
+    public static Retry retryStrategy() {
+        return Retry.fixedDelay(3, Duration.ofSeconds(2))
+                .filter(throwable -> !(throwable instanceof IllegalArgumentException))
+                .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> retrySignal.failure());
+    }
+
+    // Custom Exceptions
+    public static class ClientException extends RuntimeException {
+        public ClientException(String message) {
+            super(message);
+        }
+    }
+
+    public static class ServerException extends RuntimeException {
+        public ServerException(String message) {
+            super(message);
+        }
+    }
+}
