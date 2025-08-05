@@ -1,0 +1,97 @@
+name: Deployment
+
+on:
+  push:
+    branches:
+      - 'REL_*'
+      - 'DEV_*'
+      - 'feature/*'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 120   # adjust if your build+deploy take longer
+
+    steps:
+      - name: Set branch & sha
+        run: |
+          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          echo "SHA=${GITHUB_SHA}"             >> $GITHUB_ENV
+
+      - name: Find Unified Deployment run for this commit
+        id: find
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = process.env.BRANCH;
+            const sha    = process.env.SHA;
+            // list the last few runs of Unified Deployment on this branch
+            const resp = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'unified-deployment.yml', // or its filename/ID
+              branch,
+              event: 'push',
+              per_page: 5
+            });
+            const run = resp.data.workflow_runs.find(r => r.head_sha === sha);
+            if (!run) core.setFailed(`No Unified Deployment run found for ${sha}`);
+            core.setOutput('run_id', run.id);
+
+      - name: Wait for Unified Deployment to complete
+        id: wait
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runId = +core.getOutput('run_id');
+            let run;
+            // Poll every 10s until status is 'completed'
+            do {
+              run = (await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId
+              })).data;
+              if (run.status !== 'completed') {
+                console.log(`Status is ${run.status}, waiting…`);
+                await new Promise(r => setTimeout(r, 10000));
+              }
+            } while (run.status !== 'completed');
+            core.setOutput('conclusion', run.conclusion);
+
+      - name: Abort if build failed
+        if: ${{ steps.wait.outputs.conclusion != 'success' }}
+        run: |
+          echo "⚠️ Unified Deployment concluded with ${{ steps.wait.outputs.conclusion }} – stopping"
+          exit 1
+
+      - name: Fetch CI/CD jobs & Docker status
+        id: fetch
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runId = +core.getOutput('run_id');
+            const jobs  = (await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            })).data.jobs;
+            const ciJob = jobs.find(j => j.name === 'Run CI/CD');
+            if (!ciJob) core.setFailed('Could not find "Run CI/CD" job');
+            const step   = ciJob.steps.find(s => s.name === 'docker-publish-gated');
+            const status = step?.conclusion || 'not found';
+            core.setOutput('docker_status', status);
+
+      - name: Abort if docker-publish failed
+        if: ${{ steps.fetch.outputs.docker_status != 'success' }}
+        run: |
+          echo "🛑 docker-publish-gated was ${{ steps.fetch.outputs.docker_status }} – aborting"
+          exit 1
+
+      - name: Run deployment
+        run: |
+          echo "✅ All checks passed: deploying now…"
+          # your deployment commands here
