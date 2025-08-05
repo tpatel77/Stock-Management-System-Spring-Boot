@@ -1,0 +1,18 @@
+- name: ❓ List all job names in the upstream run
+  id: debug-jobs
+  uses: actions/github-script@v6
+  env:
+    RUN_ID: ${{ steps.find.outputs.run_id }}
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    script: |
+      const core = require('@actions/core');
+      const runId = Number(process.env.RUN_ID);
+      const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        run_id: runId
+      });
+      const names = jobs.map(j => j.name);
+      console.log('🔍 Upstream job names:', names);
+      core.setOutput('all_names', names.join(','));
