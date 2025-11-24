@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Message xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" DatatypesVersion="20170715" TransportVersion="20170715" TransactionDomain="SCRIPT" TransactionVersion="20170715" StructuresVersion="20170715" ECLVersion="20170715">
+  <Header>
+    <To Qualifier="P">CMM</To>
+    <From Qualifier="P">1099</From>
+    <MessageID>Pf859ea8edd64fe7908d89fa3379c04e</MessageID>
+    <RelatesToMessageID>dfcc4295db7dc77e5634cfccb4106123</RelatesToMessageID>
+    <SentTime>2024-10-28T15:58:31.6005601Z</SentTime>
+    <Security>
+      <Sender>
+        <TertiaryIdentification>1099</TertiaryIdentification>
+      </Sender>
+      <Receiver>
+        <TertiaryIdentification>CMM</TertiaryIdentification>
+      </Receiver>
+    </Security>
+    <SenderSoftware>
+      <SenderSoftwareDeveloper>CAREMARK ePrescribing</SenderSoftwareDeveloper>
+      <SenderSoftwareProduct>CAS CompletePA</SenderSoftwareProduct>
+      <SenderSoftwareVersionRelease>1.0.0</SenderSoftwareVersionRelease>
+    </SenderSoftware>
+    <TestMessage>1</TestMessage>
+  </Header>
+  <Body>
+    <PAInitiationResponse>
+      <PAReferenceID>BRG2JYQC</PAReferenceID>
+      <PAPriorityIndicator>S</PAPriorityIndicator>
+      <BenefitsCoordination>
+        <PayerIdentification>
+          <MutuallyDefined>2018</MutuallyDefined>
+        </PayerIdentification>
+        <PayerName>4425</PayerName>
+        <CardholderID>X%4425%2018%UAT09%SR146922501%</CardholderID>
+        <GroupID>UAT09</GroupID>
+        <PBMMemberID>X%4425%2018%UAT09%SR146922501%</PBMMemberID>
+      </BenefitsCoordination>
+      <Patient>
+        <HumanPatient>
+          <Identification>
+            <PatientAccountNumber>X%4425%2018%UAT09%SR146922501%</PatientAccountNumber>
+          </Identification>
+          <Name>
+            <LastName>CASLAST</LastName>
+            <FirstName>UAT25</FirstName>
+          </Name>
+          <Gender>F</Gender>
+          <DateOfBirth>
+            <Date>1966-05-03</Date>
+          </DateOfBirth>
+          <Address>
+            <AddressLine1>1300 E CAMPBELL RD</AddressLine1>
+            <City>RICHARDSON</City>
+            <StateProvince>TX</StateProvince>
+            <PostalCode>75081</PostalCode>
+            <CountryCode>US</CountryCode>
+          </Address>
+        </HumanPatient>
+      </Patient>
+      <Prescriber>
+        <NonVeterinarian>
+          <Identification>
+            <NPI>1212121212</NPI>
+          </Identification>
+          <Name>
+            <LastName>Jacoby</LastName>
+            <FirstName>Lawrence</FirstName>
+          </Name>
+          <Address>
+            <AddressLine1>White Lodge</AddressLine1>
+            <City>Twin Peaks</City>
+            <StateProvince>IL</StateProvince>
+            <PostalCode>98065</PostalCode>
+            <CountryCode>US</CountryCode>
+          </Address>
+          <CommunicationNumbers>
+            <PrimaryTelephone>
+              <Number>9999999999</Number>
+            </PrimaryTelephone>
+            <Fax>
+              <Number>4013357926</Number>
+            </Fax>
+          </CommunicationNumbers>
+        </NonVeterinarian>
+      </Prescriber>
+      <MedicationPrescribed>
+        <DrugDescription>Prolia 60MG/ML SC SOSY</DrugDescription>
+        <DrugCoded>
+          <ProductCode>
+            <Code>55513071021</Code>
+            <Qualifier>ND</Qualifier>
+          </ProductCode>
+        </DrugCoded>
+        <Quantity>
+          <Value>1</Value>
+          <CodeListQualifier>38</CodeListQualifier>
+          <QuantityUnitOfMeasure>
+            <Code>C38046</Code>
+          </QuantityUnitOfMeasure>
+        </Quantity>
+        <DaysSupply>30</DaysSupply>
+        <Substitutions>0</Substitutions>
+        <Diagnosis>
+          <ClinicalInformationQualifier>1</ClinicalInformationQualifier>
+          <Primary>
+            <Code>R69</Code>
+            <Qualifier>ABF</Qualifier>
+            <Description>R69 - Illness, unspecified</Description>
+          </Primary>
+        </Diagnosis>
+      </MedicationPrescribed>
+      <Response>
+        <ResponseStatus>
+          <Closed>
+            <ReasonCode>BY</ReasonCode>
+            <PANote>Your PA request cannot be processed electronically.  The drug(s) you requested is not supported by the electronic process.  For further inquiries please contact the number on the back of the member prescription card. (Message 1000)</PANote>
+          </Closed>
+        </ResponseStatus>
+      </Response>
+    </PAInitiationResponse>
+  </Body>
+</Message>
