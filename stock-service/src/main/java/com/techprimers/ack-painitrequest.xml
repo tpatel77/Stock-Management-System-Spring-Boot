@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Message DatatypesVersion="20170715" TransportVersion="20170715" TransactionDomain="SCRIPT" TransactionVersion="20170715" StructuresVersion="20170715" ECLVersion="20170715">
+    <Header>
+        <To>CMM</To>
+        <From>1099</From>
+        <MessageID>61f66a0945d446aa90b594fd40a18657</MessageID>
+        <RelatesToMessageID>fe1d1e7b4c62440e84tejastest1</RelatesToMessageID>
+        <SentTime>2025-11-19T16:07:31Z</SentTime>
+        <SenderSoftware>
+            <SenderSoftwareDeveloper>Caremark</SenderSoftwareDeveloper>
+            <SenderSoftwareProduct>RxHub-C CompletePA</SenderSoftwareProduct>
+            <SenderSoftwareVersionRelease>1.0</SenderSoftwareVersionRelease>
+        </SenderSoftware>
+        <TestMessage>1</TestMessage>
+    </Header>
+    <Body>
+        <Status>
+            <Code>010</Code>
+        </Status>
+    </Body>
+</Message>
